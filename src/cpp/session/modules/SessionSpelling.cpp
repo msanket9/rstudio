@@ -1,7 +1,7 @@
 /*
  * SessionSpelling.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -19,8 +19,8 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include <core/Error.hpp>
 #include <core/Exec.hpp>
+#include <core/system/Xdg.hpp>
 
 #include <core/Algorithm.hpp>
 #include <core/spelling/HunspellSpellingEngine.hpp>
@@ -32,6 +32,12 @@
 
 #include <session/prefs/UserPrefs.hpp>
 #include <session/SessionModuleContext.hpp>
+
+#include <shared_core/Error.hpp>
+
+#define kDictionariesPath "dictionaries"
+#define kSystemLanguages kDictionariesPath "/languages-system"
+#define kCustomDictionaries kDictionariesPath "/custom"
 
 using namespace rstudio::core;
 
@@ -72,12 +78,6 @@ json::Object dictionaryAsJson(const core::spelling::HunspellDictionary& dict)
    return dictJson;
 }
 
-FilePath userDictionariesDir()
-{
-   return module_context::userScratchPath().childPath("dictionaries");
-}
-
-
 void syncSpellingEngineDictionaries()
 {
    s_pSpellingEngine->useDictionary(prefs::userPrefs().spellingDictionaryLanguage());
@@ -92,17 +92,47 @@ core::spelling::HunspellDictionaryManager hunspellDictionaryManager()
    return dictManager;
 }
 
+} // end anonymous namespace
+
+FilePath userDictionariesDir()
+{
+   return module_context::userScratchPath().completeChildPath("dictionaries");
+}
+
+/*
+ * \deprecated
+ * For getting all languages from pre-1.3 RStudio
+ * */
+FilePath legacyAllLanguagesDir()
+{
+   return module_context::userScratchPath().completeChildPath(kSystemLanguages);
+}
+
+/*
+ * \deprecated
+ * For getting custom languages from pre-1.3 RStudio
+ * */
+FilePath legacyCustomDictionariesDir()
+{
+   return module_context::userScratchPath().completeChildPath(kCustomDictionaries);
+}
+
+FilePath allDictionariesDir()
+{
+   return core::system::xdg::userConfigDir().completeChildPath(kDictionariesPath);
+}
+
 FilePath allLanguagesDir()
 {
-   return module_context::userScratchPath().childPath(
-                                          "dictionaries/languages-system");
+   return core::system::xdg::userConfigDir().completeChildPath(kSystemLanguages);
 }
 
 FilePath customDictionariesDir()
 {
-   return module_context::userScratchPath().childPath(
-                                          "dictionaries/custom");
+   return core::system::xdg::userConfigDir().completeChildPath(kCustomDictionaries);
 }
+
+namespace {
 
 // This responds to the request path of /dictionaries/<dict>/<dict>.dic
 // and returns the file at <userScratchDir>/dictionaries/<dict>.dic
@@ -119,18 +149,47 @@ void handleDictionaryRequest(const http::Request& request, http::Response* pResp
       return;
    }
 
-   // preference order: custom -> user -> system -> pre-installed
-   if (customDictionariesDir().complete(splat[1]).exists())
+   // preference order: custom -> system -> pre-installed
+   if (customDictionariesDir().completePath(splat[1]).exists())
    {
-      pResponse->setCacheableFile(customDictionariesDir().complete(splat[1]), request);
+      pResponse->setCacheableFile(customDictionariesDir().completePath(splat[1]), request);
    }
-   else if (allLanguagesDir().complete(splat[1]).exists())
+   else if (allLanguagesDir().completePath(splat[1]).exists())
    {
-      pResponse->setCacheableFile(allLanguagesDir().complete(splat[1]), request);
+      pResponse->setCacheableFile(allLanguagesDir().completePath(splat[1]), request);
    }
-   else if (options().hunspellDictionariesPath().complete(splat[1]).exists())
+   else if (core::system::xdg::systemConfigDir()
+               .completePath(kCustomDictionaries).completePath(splat[1]).exists())
    {
-      pResponse->setCacheableFile(options().hunspellDictionariesPath().complete(splat[1]), request);
+      pResponse->setCacheableFile(core::system::xdg::systemConfigFile(
+               kCustomDictionaries).completePath(splat[1]), request);
+   }
+   else if (core::system::xdg::systemConfigDir()
+               .completePath(kSystemLanguages).completePath(splat[1]).exists())
+   {
+      pResponse->setCacheableFile(core::system::xdg::systemConfigFile(
+               kSystemLanguages).completePath(splat[1]), request);
+   }
+   /*
+    * \deprecated
+    * Calls to old deprecated dictionary locations for RStudio 1.2 and earlier
+    */
+   else if (legacyCustomDictionariesDir().completePath(splat[1]).exists())
+   {
+      pResponse->setCacheableFile(legacyCustomDictionariesDir().completePath(splat[1]), request);
+   }
+   else if (legacyAllLanguagesDir().completePath(splat[1]).exists())
+   {
+      pResponse->setCacheableFile(legacyAllLanguagesDir().completePath(splat[1]), request);
+   }
+   else if (options().hunspellDictionariesPath().completePath(splat[1]).exists())
+   {
+      pResponse->setCacheableFile(options().hunspellDictionariesPath().completePath(splat[1]), request);
+   }
+   else if (boost::algorithm::ends_with(splat[1], "aff"))
+   {
+      // the aff file is optional, especially for custom dictionaries
+      pResponse->setCacheableBody("", request);
    }
    else
    {
@@ -147,7 +206,7 @@ Error checkSpelling(const json::JsonRpcRequest& request,
       return error;
 
    json::Array misspelledIndexes;
-   for (std::size_t i=0; i<words.size(); i++)
+   for (std::size_t i=0; i<words.getSize(); i++)
    {
       if (!json::isType<std::string>(words[i]))
       {
@@ -155,7 +214,7 @@ Error checkSpelling(const json::JsonRpcRequest& request,
          continue;
       }
 
-      std::string word = words[i].get_str();
+      std::string word = words[i].getString();
       bool isCorrect = true;
       error = s_pSpellingEngine->checkSpelling(word, &isCorrect);
       if (error)
@@ -193,7 +252,7 @@ Error suggestionList(const json::JsonRpcRequest& request,
    std::transform(sugs.begin(),
                   sugs.end(),
                   std::back_inserter(sugsJson),
-                  json::toJsonString);
+                  json::toJsonValue<std::string>);
    pResponse->setResult(sugsJson);
 
    return Success();
@@ -277,7 +336,7 @@ Error installAllDictionaries(const json::JsonRpcRequest& request,
 {
    // form system path to all languages dir
    std::string targetDir = string_utils::utf8ToSystem(
-                                    allLanguagesDir().absolutePath());
+      allLanguagesDir().getAbsolutePath());
 
    // perform the download
    r::exec::RFunction dlFunc(".rs.downloadAllDictionaries",
@@ -306,19 +365,42 @@ void onUserSettingsChanged(const std::string& layer, const std::string& pref)
    syncSpellingEngineDictionaries();
 }
 
-SEXP rs_dictionariesPath()
+SEXP rs_dictionariesPath(SEXP typeSEXP)
 {
+   std::string type = r::sexp::safeAsString(typeSEXP);
+   
    r::sexp::Protect protect;
-   return r::sexp::create(
-            options().hunspellDictionariesPath().absolutePath(),
-            &protect);
+   
+   if (type == "bundled")
+   {
+      return r::sexp::createUtf8(
+               options().hunspellDictionariesPath().getAbsolutePath(),
+               &protect);
+   }
+   else if (type == "extra")
+   {
+      return r::sexp::createUtf8(
+               allDictionariesDir().getAbsolutePath(),
+               &protect);
+   }
+   else if (type == "user")
+   {
+      return r::sexp::createUtf8(
+               userDictionariesDir().getAbsolutePath(),
+               &protect);
+   }
+   else
+   {
+      r::exec::warning("unknown dictionary type '" + type + "'");
+      return R_NilValue;
+   }
 }
 
 SEXP rs_userDictionariesPath()
 {
    r::sexp::Protect protect;
    return r::sexp::create(
-            userDictionariesDir().absolutePath(),
+      userDictionariesDir().getAbsolutePath(),
             &protect);
 }
 
@@ -363,7 +445,6 @@ Error initialize()
    RS_REGISTER_CALL_METHOD(rs_dictionariesPath);
    RS_REGISTER_CALL_METHOD(rs_userDictionariesPath);
 
-
    // initialize spelling engine
    using namespace rstudio::core::spelling;
    HunspellSpellingEngine* pHunspell = new HunspellSpellingEngine(
@@ -378,7 +459,7 @@ Error initialize()
    // register rpc methods
    using boost::bind;
    using namespace module_context;
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(registerRpcMethod, "check_spelling", checkSpelling))
       (bind(registerRpcMethod, "suggestion_list", suggestionList))

@@ -1,7 +1,7 @@
 #
 # SessionErrors.R
 #
-# Copyright (C) 2009-19 by RStudio, Inc.
+# Copyright (C) 2021 by RStudio, PBC
 #
 # Unless you have received this program directly from RStudio pursuant
 # to the terms of a commercial license agreement with RStudio, then
@@ -15,9 +15,17 @@
 
 .rs.addFunction("isSourceCall", function(call)
 {
-   fun <- deparse(call[[1]])
-   return (fun == "source" ||
-           fun == "debugSource")
+   symbols <- list(
+      quote(source),
+      quote(debugSource)
+   )
+   
+   fun <- call[[1L]]
+   for (symbol in symbols)
+      if (identical(fun, symbol))
+         return(TRUE)
+   
+   FALSE
 })
 
 .rs.addFunction("recordTraceback", function(userOnly, minDepth, errorReporter)

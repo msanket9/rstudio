@@ -1,7 +1,7 @@
 /*
  * SessionUriHandlers.cpp
  *
- * Copyright (C) 2009-16 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -45,7 +45,6 @@ Error registerAsyncUriHandler(
 Error registerUriHandler(const std::string& name,
                          const http::UriHandlerFunction& handlerFunction)
 {
-
    uri_handlers::handlers().add(http::UriHandler(name, handlerFunction));
    return Success();
 }

@@ -1,7 +1,7 @@
 /*
  * UserPrefsComputedLayer.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -20,7 +20,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <core/json/Json.hpp>
+#include <shared_core/json/Json.hpp>
 #include <core/system/Environment.hpp>
 #include <core/CrashHandler.hpp>
 
@@ -43,11 +43,6 @@ Error UserStateComputedLayer::readPrefs()
          core::system::getenv("R_COMPILED_BY"), "4.9.3");
 
    cache_ = boost::make_shared<core::json::Object>(layer);
-   return Success();
-}
-
-core::Error UserStateComputedLayer::validatePrefs()
-{
    return Success();
 }
 

@@ -1,7 +1,7 @@
 /*
  * AceKeyboardPreviewer.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -26,8 +26,8 @@ public class AceKeyboardPreviewer
 {
    public interface Handler 
    {
-      boolean previewKeyDown(JavaScriptObject data, NativeEvent event) ;
-      boolean previewKeyPress(JavaScriptObject data, char charCode) ;
+      boolean previewKeyDown(JavaScriptObject data, NativeEvent event);
+      boolean previewKeyPress(JavaScriptObject data, char charCode);
    }
    
    // NOTE: The 'previewKeyDown()' handler exposed here wraps a 'true' DOM
@@ -115,5 +115,5 @@ public class AceKeyboardPreviewer
       return false;
    }
    
-   private ArrayList<Handler> handlers_ = new ArrayList<Handler>();
+   private ArrayList<Handler> handlers_ = new ArrayList<>();
 }

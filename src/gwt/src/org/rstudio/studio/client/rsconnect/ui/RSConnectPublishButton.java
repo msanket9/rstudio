@@ -1,7 +1,7 @@
 /*
  * RSConnectPublishButton.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -21,7 +21,9 @@ import org.rstudio.core.client.Debug;
 import org.rstudio.core.client.ElementIds;
 import org.rstudio.core.client.StringUtil;
 import org.rstudio.core.client.command.AppCommand;
+import org.rstudio.core.client.command.EnabledChangedEvent;
 import org.rstudio.core.client.command.EnabledChangedHandler;
+import org.rstudio.core.client.command.VisibleChangedEvent;
 import org.rstudio.core.client.command.VisibleChangedHandler;
 import org.rstudio.core.client.files.FileSystemItem;
 import org.rstudio.core.client.widget.OperationWithInput;
@@ -111,16 +113,12 @@ public class RSConnectPublishButton extends Composite
                   onPublishButtonClick();
                }
             });
-      
-      publishButton_.getElement().setId(ElementIds.ID_PREFIX + 
-            ElementIds.PUBLISH_ITEM + "_" + host);
+
       panel.add(publishButton_);
       
       // create drop menu of previous deployments/other commands
       publishMenu_ = new DeploymentPopupMenu();
       publishMenuButton_ = new ToolbarMenuButton(ToolbarButton.NoText, "Publish options", publishMenu_, true);
-      publishMenuButton_.getElement().setId(ElementIds.ID_PREFIX + 
-            ElementIds.PUBLISH_SHOW_DEPLOYMENTS + "_" + host);
       panel.add(publishMenuButton_);
       
       // initialize composite widget
@@ -166,7 +164,7 @@ public class RSConnectPublishButton extends Composite
                new VisibleChangedHandler()
          {
             @Override
-            public void onVisibleChanged(AppCommand command)
+            public void onVisibleChanged(VisibleChangedEvent event)
             {
                applyVisibility();
             }
@@ -176,7 +174,7 @@ public class RSConnectPublishButton extends Composite
                new EnabledChangedHandler()
          {
             @Override
-            public void onEnabledChanged(AppCommand command)
+            public void onEnabledChanged(EnabledChangedEvent event)
             {
                applyVisibility();
             }
@@ -388,8 +386,18 @@ public class RSConnectPublishButton extends Composite
       onPublishButtonClick();
    }
 
+   @Override
+   protected void onAttach()
+   {
+      super.onAttach();
+
+      ElementIds.assignElementId(
+            publishButton_, ElementIds.PUBLISH_ITEM + "_" + host_);
+      ElementIds.assignElementId(
+            publishMenuButton_, ElementIds.PUBLISH_SHOW_DEPLOYMENTS + "_" + host_);
+   }
+
    // Private methods --------------------------------------------------------
-   
 
    private void onPublishButtonClick()
    {
@@ -658,13 +666,13 @@ public class RSConnectPublishButton extends Composite
                      RSConnectPublishSource source = 
                            new RSConnectPublishSource(htmlFile, null, 
                                  true, true, false, "Plot", contentType_);
-                     ArrayList<String> deployFiles = new ArrayList<String>();
+                     ArrayList<String> deployFiles = new ArrayList<>();
                      deployFiles.add(FilePathUtils.friendlyFileName(htmlFile));
                      RSConnectPublishSettings settings = 
                            new RSConnectPublishSettings(
                                  deployFiles, 
-                                 new ArrayList<String>(), 
-                                 new ArrayList<String>(), 
+                                 new ArrayList<>(), 
+                                 new ArrayList<>(), 
                                  false, true);
                      events_.fireEvent(
                            new RSConnectDeployInitiatedEvent(source, settings,
@@ -960,6 +968,7 @@ public class RSConnectPublishButton extends Composite
    private Commands commands_;
    private GlobalDisplay display_;
    private Session session_;
+   @SuppressWarnings("unused")
    private Provider<UserPrefs> pUserPrefs_;
    private Provider<UserState> pUserState_;
    private PlotPublishMRUList plotMru_;

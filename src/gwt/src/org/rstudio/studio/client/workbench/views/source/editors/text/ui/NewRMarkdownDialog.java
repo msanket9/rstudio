@@ -1,7 +1,7 @@
 /*
  * NewRMarkdownDialog.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gwt.aria.client.Roles;
-import com.google.gwt.user.client.ui.Grid;
 
 import org.rstudio.core.client.ElementIds;
 import org.rstudio.core.client.StringUtil;
@@ -197,18 +196,17 @@ public class NewRMarkdownDialog extends ModalDialog<NewRMarkdownDialog.Result>
       templateChooser_ = new RmdTemplateChooser(server_);
 
       mainWidget_ = GWT.<Binder>create(Binder.class).createAndBindUi(this);
-      Roles.getPresentationRole().set(formGrid_.getElement());
       formatOptions_ = new ArrayList<>();
       style.ensureInjected();
       txtAuthor_.setText(author);
       txtTitle_.setText("Untitled");
+      Roles.getListboxRole().setAriaLabelProperty(listTemplates_.getElement(), "Templates");
       listTemplates_.addChangeHandler(new ChangeHandler()
       {
          @Override
          public void onChange(ChangeEvent event)
          {
             updateOptions(getSelectedTemplate());
-            txtTitle_.setFocus(true);
          }
       });
 
@@ -458,7 +456,6 @@ public class NewRMarkdownDialog extends ModalDialog<NewRMarkdownDialog.Result>
       return formatWrapper;
    }
    
-   @UiField Grid formGrid_;
    @UiField TextBox txtAuthor_;
    @UiField TextBox txtTitle_;
    @UiField WidgetListBox<TemplateMenuItem> listTemplates_;

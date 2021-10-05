@@ -38,11 +38,13 @@
 #include <websocketpp/common/functional.hpp>
 
 #include <boost/asio.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/system/error_code.hpp>
 
 #include <sstream>
 #include <string>
+
+using namespace boost::placeholders;
 
 namespace websocketpp {
 namespace transport {
@@ -183,8 +185,7 @@ public:
 
         m_io_service = ptr;
         m_external_io_service = true;
-        m_acceptor = lib::make_shared<boost::asio::ip::tcp::acceptor>(
-            lib::ref(*m_io_service));
+        m_acceptor = lib::make_shared<boost::asio::ip::tcp::acceptor>(*m_io_service);
 
         m_state = READY;
         ec = lib::error_code();
@@ -609,9 +610,7 @@ public:
      * @since 0.3.0
      */
     void start_perpetual() {
-        m_work = lib::make_shared<boost::asio::io_service::work>(
-            lib::ref(*m_io_service)
-        );
+        m_work = lib::make_shared<boost::asio::io_service::work>(*m_io_service);
     }
 
     /// Clears the endpoint's perpetual flag, allowing it to exit when empty
@@ -775,8 +774,7 @@ protected:
 
         // Create a resolver
         if (!m_resolver) {
-            m_resolver = lib::make_shared<boost::asio::ip::tcp::resolver>(
-                lib::ref(*m_io_service));
+            m_resolver = lib::make_shared<boost::asio::ip::tcp::resolver>(*m_io_service);
         }
 
         std::string proxy = tcon->get_proxy();

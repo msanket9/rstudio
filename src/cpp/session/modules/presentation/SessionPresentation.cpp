@@ -1,7 +1,7 @@
 /*
  * SessionPresentation.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -19,7 +19,7 @@
 #include "SessionPresentation.hpp"
 
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include <core/Exec.hpp>
 #include <core/http/Util.hpp>
@@ -40,6 +40,7 @@
 
 
 using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace session {
@@ -67,7 +68,7 @@ SEXP rs_showPresentation(SEXP fileSEXP)
       // validate path
       FilePath filePath(r::sexp::asString(fileSEXP));
       if (!filePath.exists())
-         throw r::exec::RErrorException("File path " + filePath.absolutePath() +
+         throw r::exec::RErrorException("File path " + filePath.getAbsolutePath() +
                                         " does not exist.");
 
       showPresentation(filePath);
@@ -93,11 +94,11 @@ SEXP rs_showPresentationHelpDoc(SEXP helpDocSEXP)
 
       // resolve against presentation directory
       std::string helpDoc = r::sexp::asString(helpDocSEXP);
-      FilePath helpDocPath = presentation::state::directory().childPath(
-                                                                  helpDoc);
+      FilePath helpDocPath = presentation::state::directory().completeChildPath(
+         helpDoc);
       if (!helpDocPath.exists())
       {
-         throw r::exec::RErrorException("Path " + helpDocPath.absolutePath()
+         throw r::exec::RErrorException("Path " + helpDocPath.getAbsolutePath()
                                         + " not found.");
       }
 
@@ -144,12 +145,12 @@ Error createNewPresentation(const json::JsonRpcRequest& request,
 
    // process template
    std::map<std::string,std::string> vars;
-   vars["name"] = filePath.stem();
+   vars["name"] = filePath.getStem();
    core::text::TemplateFilter filter(vars);
 
    // read file with template filter
-   FilePath templatePath = session::options().rResourcesPath().complete(
-                                             "templates/r_presentation.Rpres");
+   FilePath templatePath = session::options().rResourcesPath().completePath(
+      "templates/r_presentation.Rpres");
    std::string presContents;
    error = core::readStringFromFile(templatePath, filter, &presContents);
    if (error)
@@ -205,8 +206,7 @@ Error presentationExecuteCode(const json::JsonRpcRequest& request,
 
    // execute within the context of either the tutorial project directory
    // or presentation directory
-   RestoreCurrentPathScope restorePathScope(
-                                          module_context::safeCurrentPath());
+   RestoreCurrentPathScope restorePathScope(module_context::safeCurrentPath(), ERROR_LOCATION);
    if (presentation::state::isTutorial() &&
        projects::projectContext().hasProject())
    {
@@ -313,7 +313,7 @@ Error getSlideNavigationForFile(const json::JsonRpcRequest& request,
 
    // get slide navigation
    json::Object slideNavigationJson;
-   error = getSlideNavigation(code, filePath.parent(), &slideNavigationJson);
+   error = getSlideNavigation(code, filePath.getParent(), &slideNavigationJson);
    if (error)
       return error;
    pResponse->setResult(slideNavigationJson);
@@ -350,7 +350,7 @@ Error clearPresentationCache(const json::JsonRpcRequest& request,
    {
       pResponse->setError(systemError(boost::system::errc::io_error,
                                       ERROR_LOCATION),
-                          json::toJsonString(errorResponse.message));
+                          json::toJsonValue(errorResponse.message));
    }
 
    return Success();
@@ -372,7 +372,7 @@ Error createStandalonePresentation(const json::JsonRpcRequest& request,
    {
       pResponse->setError(systemError(boost::system::errc::io_error,
                                       ERROR_LOCATION),
-                          json::toJsonString(errorResponse.message));
+                          json::toJsonValue(errorResponse.message));
    }
 
    return Success();
@@ -393,7 +393,7 @@ Error createDesktopViewInBrowserPresentation(
    {
       pResponse->setError(systemError(boost::system::errc::io_error,
                                       ERROR_LOCATION),
-                          json::toJsonString(errorResponse.message));
+                          json::toJsonValue(errorResponse.message));
    }
 
    return Success();
@@ -404,9 +404,9 @@ Error createPresentationRpubsSource(const json::JsonRpcRequest& request,
 {
    // use a stable location in the presentation directory for the Rpubs
    // source file so that update works across sessions
-   std::string stem = presentation::state::filePath().stem();
-   FilePath filePath = presentation::state::directory().childPath(
-                                                      stem + "-rpubs.html");
+   std::string stem = presentation::state::filePath().getStem();
+   FilePath filePath = presentation::state::directory().completeChildPath(
+      stem + "-rpubs.html");
 
    ErrorResponse errorResponse;
    if (savePresentationAsRpubsSource(filePath, &errorResponse))
@@ -422,7 +422,7 @@ Error createPresentationRpubsSource(const json::JsonRpcRequest& request,
    {
       pResponse->setError(systemError(boost::system::errc::io_error,
                                       ERROR_LOCATION),
-                          json::toJsonString(errorResponse.message));
+                          json::toJsonValue(errorResponse.message));
    }
 
    return Success();
@@ -449,7 +449,7 @@ Error initialize()
 
    using boost::bind;
    using namespace session::module_context;
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(registerUriHandler, "/presentation", handlePresentationPaneRequest))
       (bind(registerRpcMethod, "create_standalone_presentation", createStandalonePresentation))

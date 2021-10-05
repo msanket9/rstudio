@@ -1,7 +1,7 @@
 /*
  * AsyncConnectionImpl.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -28,7 +28,7 @@
 #include <boost/asio/ssl.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Log.hpp>
 #include <core/Thread.hpp>
 
@@ -103,16 +103,25 @@ public:
          boost::shared_ptr<AsyncConnectionImpl<SocketType> >,
          http::Request*)> Handler;
 
+    typedef boost::function<void(
+         boost::weak_ptr<AsyncConnectionImpl<SocketType>>)> ClosedHandler;
+
+   typedef boost::function<bool(
+         boost::shared_ptr<AsyncConnectionImpl<SocketType> >,
+         http::Request*)> HeadersParsedHandler;
+
 public:
    AsyncConnectionImpl(boost::asio::io_service& ioService,
                        boost::shared_ptr<boost::asio::ssl::context> sslContext,
-                       const Handler& onHeadersParsed,
+                       const HeadersParsedHandler& onHeadersParsed,
                        const Handler& onRequestParsed,
+                       const ClosedHandler& onClosed,
                        const RequestFilter& requestFilter = RequestFilter(),
                        const ResponseFilter& responseFilter = ResponseFilter())
       : ioService_(ioService),
         onHeadersParsed_(onHeadersParsed),
         onRequestParsed_(onRequestParsed),
+        onClosed_(onClosed),
         requestFilter_(requestFilter),
         responseFilter_(responseFilter),
         closed_(false),
@@ -133,6 +142,17 @@ public:
       {
          socket_.reset(new SocketType(ioService));
          socketOperations_.reset(new SocketOperations<SocketType>(socket_));
+      }
+   }
+
+   virtual ~AsyncConnectionImpl()
+   {
+      try
+      {
+         close();
+      }
+      catch(...)
+      {
       }
    }
 
@@ -167,11 +187,6 @@ public:
       return request_;
    }
 
-   virtual const std::string& originalUri() const
-   {
-      return originalUri_;
-   }
-
    virtual http::Response& response()
    {
       return response_;
@@ -184,10 +199,11 @@ public:
          response_.setHeader("Date", util::httpDate());
       if (close)
          response_.setHeader("Connection", "close");
+      response_.setHeader("X-Content-Type-Options", "nosniff");
 
       // call the response filter if we have one
       if (responseFilter_)
-         responseFilter_(originalUri_, &response_);
+         responseFilter_(originalRequest_, &response_);
 
       if (response_.isStreamResponse())
       {
@@ -275,6 +291,7 @@ public:
    {
       // ensure the socket is only closed once - boost considers
       // multiple closes an error, and this can lead to a segfault
+      ClosedHandler closedHandler;
       RECURSIVE_LOCK_MUTEX(mutex_)
       {
          if (!closed_)
@@ -284,12 +301,18 @@ public:
                LOG_ERROR(error);
 
             closed_ = true;
+            closedHandler = onClosed_;
 
             // cleanup any associated data with the connection
             connectionData_.clear();
          }
       }
       END_LOCK_MUTEX;
+
+      // notify that we have closed the connection
+      // we do this after giving up the mutex to prevent potential deadlock
+      if (closedHandler)
+         closedHandler(AsyncConnectionImpl<SocketType>::weak_from_this());
    }
 
    void setUploadHandler(const AsyncUriUploadHandlerFunction& handler)
@@ -373,8 +396,8 @@ private:
             // headers parsed - body parsing has not yet begun
             else if (status == RequestParser::headers_parsed)
             {
-               // record the original uri
-               originalUri_ = request_.absoluteUri();
+               // record the original request
+               originalRequest_.assign(request_);
 
                // call the request filter if we have one
                if (requestFilter_)
@@ -392,7 +415,11 @@ private:
                }
                else
                {
-                  callHeadersParsedHandler();
+                  if (!callHeadersParsedHandler())
+                  {
+                     writeResponse();
+                     return;
+                  }
 
                   // we need to resume body parsing by recalling the parse
                   // method and providing the exact same buffer to continue
@@ -455,7 +482,11 @@ private:
       }
       else
       {
-         callHeadersParsedHandler();
+         if (!callHeadersParsedHandler())
+         {
+            writeResponse();
+            return;
+         }
 
          // we need to resume body parsing by recalling the parse
          // method and providing the exact same buffer to continue
@@ -464,10 +495,10 @@ private:
       }
    }
 
-   void callHeadersParsedHandler()
+   bool callHeadersParsedHandler()
    {
-      onHeadersParsed_(AsyncConnectionImpl<SocketType>::shared_from_this(),
-                       &request_);
+      return onHeadersParsed_(AsyncConnectionImpl<SocketType>::shared_from_this(),
+                              &request_);
    }
 
    void callHandler()
@@ -484,8 +515,11 @@ private:
          {
             // log the error if it wasn't connection terminated
             Error error(e, ERROR_LOCATION);
-            if (!http::isConnectionTerminatedError(error))
+            if (!http::isConnectionTerminatedError(error) &&
+                !http::isWrongProtocolTypeError((error)))
+            {
                LOG_ERROR(error);
+            }
          }
          
          // close the socket
@@ -553,14 +587,15 @@ private:
    // depending on whether or not SSL is enabled
    boost::shared_ptr<ISocketOperations> socketOperations_;
 
-   Handler onHeadersParsed_;
+   HeadersParsedHandler onHeadersParsed_;
    Handler onRequestParsed_;
+   ClosedHandler onClosed_;
    FormHandler formHandler_;
    RequestFilter requestFilter_;
    ResponseFilter responseFilter_;
-   boost::array<char, 8192> buffer_ ;
-   RequestParser requestParser_ ;
-   std::string originalUri_;
+   boost::array<char, 8192> buffer_;
+   RequestParser requestParser_;
+   Request originalRequest_;
    http::Request request_;
    http::Response response_;
 

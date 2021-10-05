@@ -1,7 +1,7 @@
 /*
  * SessionLocalStreamHttpConnectionListener.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -13,11 +13,13 @@
  *
  */
 
+#ifndef SESSION_LOCAL_STREAM_HTTP_CONNECTION_LISTENER_HPP
+#define SESSION_LOCAL_STREAM_HTTP_CONNECTION_LISTENER_HPP
 
 #include <vector>
 
-#include <core/Error.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/Error.hpp>
+#include <shared_core/FilePath.hpp>
 
 #include <core/system/System.hpp>
 #include <core/system/PosixUser.hpp>
@@ -26,7 +28,7 @@
 
 #include "SessionHttpConnectionListenerImpl.hpp"
 
-using namespace rstudio::core ;
+using namespace rstudio::core;
 
 namespace rstudio {
 namespace session {
@@ -37,7 +39,7 @@ class LocalStreamHttpConnectionListener :
 {
 public:
    LocalStreamHttpConnectionListener(const FilePath& streamPath,
-                                     core::system::FileMode streamFileMode,
+                                     core::FileMode streamFileMode,
                                      const std::string& secret,
                                      int limitRpcClientUid)
       : localStreamPath_(streamPath),
@@ -142,8 +144,7 @@ private:
          return error;
 
       // chmod to ensure other users can read the file
-      return changeFileMode(pidFile,
-                            core::system::UserReadWriteGroupEveryoneReadMode);
+      return pidFile.changeFileMode(core::FileMode::USER_READ_WRITE_ALL_READ);
    }
 
    Error cleanupPidFile()
@@ -153,12 +154,12 @@ private:
 
    FilePath pidFilePath()
    {
-      return FilePath(localStreamPath_.absolutePath() + ".pid");
+      return FilePath(localStreamPath_.getAbsolutePath() + ".pid");
    }
 
 private:
    core::FilePath localStreamPath_;
-   core::system::FileMode streamFileMode_;
+   core::FileMode streamFileMode_;
 
    // desktop shared secret
    std::string secret_;
@@ -169,3 +170,5 @@ private:
 
 } // namespace session
 } // namespace rstudio
+
+#endif /* SESSION_LOCAL_STREAM_HTTP_CONNECTION_LISTENER_HPP */

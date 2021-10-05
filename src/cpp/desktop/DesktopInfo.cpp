@@ -1,7 +1,7 @@
 /*
  * DesktopInfo.cpp
  *
- * Copyright (C) 2009-17 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -23,7 +23,7 @@
 #include <QThread>
 
 #include <core/Algorithm.hpp>
-#include <core/SafeConvert.hpp>
+#include <shared_core/SafeConvert.hpp>
 #include <core/system/Process.hpp>
 #include <core/system/Environment.hpp>
 #include <core/system/Process.hpp>
@@ -114,12 +114,12 @@ void buildFontDatabase()
       core::system::ProcessOptions options;
       core::system::ProcessResult result;
       Error error = core::system::runCommand(
-               "fc-list :spacing=100 -f '%{family}\n' | cut -d ',' -f 1 | sort | uniq",
+               "{ fc-list :mono -f '%{family}\n' & fc-list :dual -f '%{family}\n' & fc-list :charcell -f '%{family}\n'; } | cut -d ',' -f 1 | sort | uniq",
                options,
                &result);
 
       bool didReturnFonts =
-            error == Success() &&
+            !error &&
             result.exitStatus == EXIT_SUCCESS &&
             !result.stdOut.empty();
 

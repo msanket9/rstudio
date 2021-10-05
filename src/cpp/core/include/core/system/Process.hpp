@@ -1,7 +1,7 @@
 /*
  * Process.hpp
  *
- * Copyright (C) 2009-17 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -28,7 +28,7 @@
 
 #include <core/system/System.hpp>
 #include <core/system/Types.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 
 namespace rstudio {
 namespace core {
@@ -239,6 +239,11 @@ struct ProcessResult
 Error runProgram(const std::string& executable,
                  const std::vector<std::string>& args,
                  const std::string& input,
+                 const ProcessOptions& options,
+                 ProcessResult* pResult);
+
+Error runProgram(const std::string& executable,
+                 const std::vector<std::string>& args,
                  const ProcessOptions& options,
                  ProcessResult* pResult);
 

@@ -1,7 +1,7 @@
 /*
  * SessionPlumberViewer.cpp
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,7 +18,7 @@
 #include <boost/format.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Exec.hpp>
 
 #include <r/RSexp.hpp>
@@ -134,15 +134,15 @@ Error getPlumberRunCmd(const json::JsonRpcRequest& request,
    
    // Existence of "entrypoint.R" requires a different form of Plumber run command
    bool hasEntrypointFile = false;
-   FilePath searchFolder = plumberPath.isDirectory() ? plumberPath : plumberPath.parent();
+   FilePath searchFolder = plumberPath.isDirectory() ? plumberPath : plumberPath.getParent();
    std::vector<FilePath> children;
-   error = searchFolder.children(&children);
+   error = searchFolder.getChildren(children);
    if (error)
       return error;
 
    for (const auto& child : children)
    {
-      if (!child.isDirectory() && string_utils::toLower(child.filename()) == "entrypoint.r")
+      if (!child.isDirectory() && string_utils::toLower(child.getFilename()) == "entrypoint.r")
       {
          hasEntrypointFile = true;
          break;
@@ -153,7 +153,7 @@ Error getPlumberRunCmd(const json::JsonRpcRequest& request,
    {
       // entrypoint.R mode operates on the folder
       if (!plumberPath.isDirectory())
-         plumberPath = plumberPath.parent();
+         plumberPath = plumberPath.getParent();
    }
 
    std::string plumberRunPath = module_context::pathRelativeTo(
@@ -188,7 +188,7 @@ Error getPlumberRunCmd(const json::JsonRpcRequest& request,
 
 Error initPlumberViewerPref(boost::shared_ptr<std::string> pPlumberViewerType)
 {
-   SEXP plumberBrowser = r::options::getOption("plumber.swagger.url");
+   SEXP plumberBrowser = r::options::getOption("plumber.docs.callback");
    *pPlumberViewerType = prefs::userPrefs().plumberViewerType();
    if (plumberBrowser == R_NilValue)
    {
@@ -211,7 +211,7 @@ Error initialize()
    RS_REGISTER_CALL_METHOD(rs_plumberviewer);
 
    prefs::userPrefs().onChanged.connect(bind(
-            onUserSettingsChanged, _1, pPlumberViewerType));
+            onUserSettingsChanged, _2, pPlumberViewerType));
 
    ExecBlock initBlock;
    initBlock.addFunctions()

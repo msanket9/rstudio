@@ -1,7 +1,7 @@
 #
 # test-prefs
 #
-# Copyright (C) 2009-19 by RStudio, Inc.
+# Copyright (C) 2021 by RStudio, PBC
 #
 # Unless you have received this program directly from RStudio pursuant
 # to the terms of a commercial license agreement with RStudio, then
@@ -48,3 +48,19 @@ test_that("default values for preferences are respected", {
    }
 })
 
+test_that("rstudio API prefs are separate from IDE prefs", {
+   # read an old value from the RStudio preference
+   oldVal <- .rs.api.readRStudioPreference("code_completion_delay")
+   newVal <- oldVal + 50L
+
+   # save the new value as a regular (non-RStudio) pref
+   .rs.api.writePreference("code_completion_delay", newVal)
+
+   # ensure that the new value was written correctly
+   prefVal <- .rs.api.readPreference("code_completion_delay")
+   expect_equal(prefVal, newVal)
+
+   # ensure that the original RStudio preference is untouched
+   prefVal <- .rs.api.readRStudioPreference("code_completion_delay")
+   expect_equal(prefVal, oldVal)
+})

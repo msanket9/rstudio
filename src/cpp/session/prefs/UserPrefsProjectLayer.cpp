@@ -1,7 +1,7 @@
 /*
  * UserPrefsLayer.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -62,12 +62,6 @@ core::Error UserPrefsProjectLayer::readPrefs()
    {
       cache_ = boost::make_shared<json::Object>();
    }
-   return Success();
-}
-
-core::Error UserPrefsProjectLayer::validatePrefs()
-{
-   // Project level prefs can't be invalid.
    return Success();
 }
 

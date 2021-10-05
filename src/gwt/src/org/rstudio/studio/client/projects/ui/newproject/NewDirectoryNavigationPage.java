@@ -1,7 +1,7 @@
 /*
  * NewDirectoryNavigationPage.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -75,8 +75,8 @@ public class NewDirectoryNavigationPage
    private static ArrayList<WizardPage<NewProjectInput, NewProjectResult>>
                                          createPages(SessionInfo sessionInfo)
    {
-      ArrayList<WizardPage<NewProjectInput, NewProjectResult>> pages = 
-            new ArrayList<WizardPage<NewProjectInput, NewProjectResult>>();
+      ArrayList<WizardPage<NewProjectInput, NewProjectResult>> pages =
+            new ArrayList<>();
       
       // add default RStudio dialogs
       pages.add(new NewDirectoryPage());
@@ -183,6 +183,7 @@ public class NewDirectoryNavigationPage
          initWidget(panel);
       }
 
+      @SuppressWarnings("unused")
       private ButtonClickManager clickManager_;
    }
    

@@ -1,7 +1,7 @@
 /*
  * A11y.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,17 +18,13 @@ import com.google.gwt.dom.client.Element;
 import com.google.gwt.user.client.DOM;
 import com.google.gwt.user.client.ui.Widget;
 import org.rstudio.core.client.StringUtil;
+import org.rstudio.core.client.theme.res.ThemeStyles;
 
 /**
  * Accessibility helpers including newer ARIA stuff not included with GWT
  */
 public class A11y
 {
-   public static void setARIADialogModal(Element element)
-   {
-      element.setAttribute("aria-modal", "true");
-   }
-
    /**
     * Flag an image that does not convey content, is decorative, or is
     * redundant (purpose already conveyed in text).
@@ -37,15 +33,6 @@ public class A11y
    public static void setDecorativeImage(Element element)
    {
       element.setAttribute("alt", "");
-   }
-
-   public static void setARIAMenuItemExpanded(Element element, boolean expanded)
-   {
-      // W3C recommends having no aria-expanded state when value is false
-      if (expanded)
-         element.setAttribute("aria-expanded", "true");
-      else
-         element.removeAttribute("aria-expanded");
    }
 
    public static void setARIATablistOrientation(Element element, boolean vertical)
@@ -81,7 +68,7 @@ public class A11y
       else
          element.setAttribute("aria-current", value);
    }
-   
+
    /**
     * Set aria-current value on an element
     * @param widget widget to mark
@@ -98,6 +85,85 @@ public class A11y
     */
    public static void setARIAHidden(Widget widget)
    {
-      widget.getElement().setAttribute("aria-hidden", "true");
+      setARIAHidden(widget.getElement());
+   }
+
+   /**
+    * Make an element hidden to screen readers.
+    * @param el
+    */
+   public static void setARIAHidden(Element el)
+   {
+      el.setAttribute("aria-hidden", "true");
+   }
+
+   /**
+    * Make an element visible to screen readers.
+    * @param el
+    */
+   public static void setARIAVisible(Element el)
+   {
+      el.removeAttribute("aria-hidden");
+   }
+
+   public static void setVisuallyHidden(Widget widget)
+   {
+      setVisuallyHidden(widget.getElement());
+   }
+
+   public static void setVisuallyHidden(Element el)
+   {
+      el.setClassName(ThemeStyles.INSTANCE.visuallyHidden());
+   }
+
+   public static void unsetVisuallyHidden(Widget widget)
+   {
+      unsetVisuallyHidden(widget.getElement());
+   }
+
+   public static void unsetVisuallyHidden(Element el)
+   {
+      el.removeClassName(ThemeStyles.INSTANCE.visuallyHidden());
+   }
+
+   public static void setARIANotExpanded(Element el)
+   {
+      // aria best-practices recommends not including aria-expanded property at all instead
+      // of setting it to false
+      el.removeAttribute("aria-expanded");
+   }
+
+   public static void setInert(Element el, boolean inert)
+   {
+      if (inert)
+      {
+         setARIAHidden(el);
+         el.setAttribute("inert", "");
+      }
+      else
+      {
+         setARIAVisible(el);
+         el.removeAttribute("inert");
+      }
+   }
+
+   public static void setARIAAutocomplete(Element el, String val)
+   {
+      el.setAttribute("aria-autocomplete", val);
+   }
+
+   public static void setARIAAutocomplete(Widget widget, String val)
+   {
+      setARIAAutocomplete(widget.getElement(), val);
+   }
+
+   /**
+    * Add a focus outline to the element; will be automatically removed when
+    * focus leaves the element. See the focus-visible.js polyfill for more details.
+    */
+   public static void showFocusOutline(Element el)
+   {
+      el.addClassName("focus-visible");
+      el.setAttribute("data-focus-visible-added", "");
    }
 }

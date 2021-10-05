@@ -2,7 +2,7 @@
 /*
  * SessionConstants.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -20,6 +20,7 @@
 #define kEventsPending                    "ep"
 
 #define kRStudioUserIdentity              "RSTUDIO_USER_IDENTITY"
+#define kRStudioSystemUserIdentity        "X-RStudioSystemUserIdentity"
 #define kRStudioUserIdentityDisplay       "X-RStudioUserIdentity"
 #define kRStudioLimitRpcClientUid         "RSTUDIO_LIMIT_RPC_CLIENT_UID"
 #define kRSessionPortNumber               "RSTUDIO_SESSION_PORT"
@@ -62,15 +63,20 @@
 #define kRunTestsSessionOption            "run-tests"
 #define kRunScriptSessionOption           "run-script"
 
+#define kVersionSessionOption             "version"
+
+#define kLimitSessionOption               "session-limit"
 #define kTimeoutSessionOption             "session-timeout-minutes"
 #define kTimeoutSuspendSessionOption      "session-timeout-suspend"
 #define kDisconnectedTimeoutSessionOption "session-disconnected-timeout-minutes"
-
+#define kSessionEnvVarSaveBlacklist       "session-env-var-save-blacklist"
 #define kVerifySignaturesSessionOption    "verify-signatures"
 #define kStandaloneSessionOption          "standalone"
 #define kWwwAddressSessionOption          "www-address"
 #define kWwwPortSessionOption             "www-port"
+#define kWwwResusePorts                   "www-reuse-ports"
 #define kTerminalPortOption               "terminal-port"
+#define kSessionSuspendOnIncompleteStatement "session-suspend-on-incomplete-statement"
 
 #define kLauncherSessionOption            "launcher-session"
 
@@ -80,6 +86,10 @@
 #define kWebSocketHandshakeTimeout        "websocket-handshake-timeout"
 
 #define kPackageOutputInPackageFolder     "package-output-to-package-folder"
+
+#define kRootPathSessionOption            "session-root-path"
+#define kUseSecureCookiesSessionOption    "session-use-secure-cookies"
+#define kSameSiteSessionOption            "session-same-site"
 
 // NOTE: literal versions of these are depended upon by the desktop/rsinverse
 // project so they should be updated there as well if they are changed
@@ -91,10 +101,6 @@
 #define kListsPath          "lists"
 #define kProjectMruList     "project_mru"
 
-#define kUserSettingsDir       "user-settings"
-#define kUserSettingsFile      kUserSettingsDir
-#define kContextIdentifier     "contextIdentifier"
-
 #define kServerHomeSetting     "showUserHomePage"
 #define kServerHomeAlways      "always"
 #define kServerHomeNever       "never"
@@ -103,8 +109,6 @@
 #define kReuseSessionsForProjectLinksSettings "reuseSessionsForProjectLinks"
 
 #define kRStudioNoTransformRedirect "X-RStudio-NoTransformRedirect"
-
-#define kServerSettingsDir "/etc/rstudio"
 
 #define kSessionProxyDefaultPort   "8789"
 #define kRStudioSessionProxyPort   "X-RStudio-Session-Proxy-Port"
@@ -119,15 +123,22 @@
 #define kRunRprofileYes      1
 #define kRunRprofileDefault  2
 
+#define kSessionTmpDirEnvVar       "RS_SESSION_TMP_DIR"
+#define kSessionTmpDir             "rstudio-rsession"
+
+#define kDefaultPandocPath         "bin/pandoc"
+#define kDefaultPostbackPath       "bin/postback/rpostback"
+#define kDefaultRsclangPath        "bin/rsclang"
+
 // json rpc methods we handle (the rest are delegated to the HttpServer)
-const char * const kClientInit = "client_init" ;
+const char * const kClientInit = "client_init";
 const char * const kEditCompleted = "edit_completed";
 const char * const kChooseFileCompleted = "choose_file_completed";
 const char * const kLocatorCompleted = "locator_completed";
 const char * const kUserPromptCompleted = "user_prompt_completed";
 const char * const kAdminNotificationAcknowledged = "admin_notification_acknowledged";
 const char * const kHandleUnsavedChangesCompleted = "handle_unsaved_changes_completed";
-const char * const kQuitSession = "quit_session" ;   
+const char * const kQuitSession = "quit_session";
 const char * const kSuspendSession = "suspend_session";
 const char * const kInterrupt = "interrupt";
 const char * const kConsoleInput = "console_input";

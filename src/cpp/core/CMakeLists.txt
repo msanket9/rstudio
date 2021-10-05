@@ -1,7 +1,7 @@
 #
 # CMakeLists.txt
 #
-# Copyright (C) 2009-19 by RStudio, Inc.
+# Copyright (C) 2021 by RStudio, PBC
 #
 # Unless you have received this program directly from RStudio pursuant
 # to the terms of a commercial license agreement with RStudio, then
@@ -26,8 +26,7 @@ if(MSVC)
 endif()
 
 # source files
-set (CORE_SOURCE_FILES
-   Assert.cpp
+set(CORE_SOURCE_FILES
    Backtrace.cpp
    Base64.cpp
    BoostErrors.cpp
@@ -36,28 +35,22 @@ set (CORE_SOURCE_FILES
    ConfigProfile.cpp
    ConfigUtils.cpp
    CrashHandler.cpp
+   Database.cpp
    DateTime.cpp
    ExponentialBackoff.cpp
-   Error.cpp
    Exec.cpp
    FileInfo.cpp
-   FileLogWriter.cpp
-   FilePath.cpp
    FileSerializer.cpp
    FileUtils.cpp
    GitGraph.cpp
-   Hash.cpp
    HtmlUtils.cpp
    Log.cpp
    LogOptions.cpp
-   LogWriter.cpp
    PerformanceTimer.cpp
    ProgramOptions.cpp
    RegexUtils.cpp
    RecursionGuard.cpp
-   SafeConvert.cpp
    Settings.cpp
-   StderrLogWriter.cpp
    StringUtils.cpp
    ColorUtils.cpp
    Thread.cpp
@@ -81,7 +74,6 @@ set (CORE_SOURCE_FILES
    libclang/TranslationUnit.cpp
    libclang/UnsavedFiles.cpp
    libclang/Utils.cpp
-   json/Json.cpp
    json/JsonRpc.cpp
    http/Cookie.cpp
    http/Header.cpp
@@ -95,6 +87,7 @@ set (CORE_SOURCE_FILES
    http/RequestParser.cpp
    http/Response.cpp
    http/SocketProxy.cpp
+   http/Ssl.cpp
    http/URL.cpp
    http/UriHandler.cpp
    http/Util.cpp
@@ -118,6 +111,7 @@ set (CORE_SOURCE_FILES
    spelling/HunspellCustomDictionaries.cpp
    spelling/HunspellDictionaryManager.cpp
    spelling/HunspellSpellingEngine.cpp
+   system/Architecture.cpp
    system/ChildProcessSubprocPoll.cpp
    system/Crypto.cpp
    system/Environment.cpp
@@ -181,55 +175,21 @@ if (UNIX)
    endif()
 
    # include directories and libraries
-   set (CORE_SYSTEM_LIBRARIES
+   set(CORE_SYSTEM_LIBRARIES
       ${PTHREAD_LIBRARIES}
       ${UTIL_LIBRARIES}
       ${UUID_LIBRARIES}
       ${RT_LIBRARIES}
       ${ZLIB_LIBRARIES}
-      ${CORE_SERVICES_LIBRARY}
-   )
+      ${CORE_SERVICES_LIBRARY})
 
-   # handle El Capitan moving OpenSSL away
-   if(APPLE)
-      if(${MACOSX_VERSION} VERSION_GREATER "10.10"
-            AND EXISTS "/usr/local/opt/openssl")
-
-         set(CORE_SYSTEM_LIBRARIES
-            ${CORE_SYSTEM_LIBRARIES}
-            -L/usr/local/opt/openssl/lib -lssl -lcrypto)
-
-         set(CORE_INCLUDE_DIRS
-            ${CORE_INCLUDE_DIRS}
-            /usr/local/opt/openssl/include)
-
-         if(NOT DEFINED OPENSSL_ROOT_DIR)
-            set(OPENSSL_ROOT_DIR
-               /usr/local/opt/openssl)
-         endif()
-      endif()
-   endif()
-
-   find_package(OpenSSL REQUIRED QUIET)
-   set(CORE_SYSTEM_LIBRARIES
-         ${CORE_SYSTEM_LIBRARIES}
-         ${OPENSSL_LIBRARIES}
-      )
-   set(CORE_INCLUDE_DIRS
-      ${CORE_INCLUDE_DIRS}
-      ${OPENSSL_INCLUDE_DIR}
-   )
+   list(APPEND CORE_SYSTEM_LIBRARIES ${OPENSSL_LIBRARIES})
+   list(APPEND CORE_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR})
 
    if(RSTUDIO_SERVER)
       find_package(PAM REQUIRED)
-      set(CORE_SYSTEM_LIBRARIES
-         ${CORE_SYSTEM_LIBRARIES}
-         ${PAM_LIBRARIES}
-      )
-      set(CORE_INCLUDE_DIRS
-         ${CORE_INCLUDE_DIRS}
-         ${PAM_INCLUDE_DIRS}
-      )
+      list(APPEND CORE_SYSTEM_LIBRARIES ${PAM_LIBRARIES})
+      list(APPEND CORE_INCLUDE_DIRS ${PAM_INCLUDE_DIRS})
    endif()
 
    # source files
@@ -239,7 +199,6 @@ if (UNIX)
       r_util/REnvironmentPosix.cpp
       r_util/RSessionLaunchProfile.cpp
       r_util/RVersionsPosix.cpp
-      SyslogLogWriter.cpp
       system/PosixChildProcessTracker.cpp
       system/PosixEnvironment.cpp
       system/PosixFileScanner.cpp
@@ -259,13 +218,16 @@ if (UNIX)
 
    if(APPLE)
       set(CORE_SOURCE_FILES ${CORE_SOURCE_FILES}
+         http/Keychain.mm
          system/file_monitor/MacFileMonitor.cpp
          system/recycle_bin/MacRecycleBin.cpp
+         system/MacResources.cpp
       )
    else()
       set(CORE_SOURCE_FILES ${CORE_SOURCE_FILES}
          system/file_monitor/LinuxFileMonitor.cpp
          system/recycle_bin/LinuxRecycleBin.cpp
+         system/LinuxResources.cpp
       )
    endif()
 
@@ -288,7 +250,6 @@ else()
 
    # source files
    set(CORE_SOURCE_FILES ${CORE_SOURCE_FILES}
-      Win32StringUtils.cpp
       http/NamedPipeProtocol.cpp
       system/Win32FileScanner.cpp
       system/RegistryKey.cpp
@@ -302,6 +263,7 @@ else()
       system/Win32ShellUtils.cpp
       system/Win32System.cpp
       system/Win32ChildProcess.cpp
+      system/Win32Resources.cpp
       system/file_monitor/Win32FileMonitor.cpp
       system/recycle_bin/Win32RecycleBin.cpp
       r_util/RToolsInfo.cpp
@@ -313,7 +275,7 @@ configure_file (${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
       ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 # define include dirs
-set(CORE_INCLUDE_DIRS ${CORE_INCLUDE_DIRS} include)
+list(APPEND CORE_INCLUDE_DIRS include)
 
 # search for core addins
 if(RSTUDIO_ADDINS_PATH)
@@ -327,9 +289,12 @@ if(RSTUDIO_ADDINS_PATH)
    endif()
 endif()
 
-# include directories
+set(SHARED_CORE_INCLUDE_DIRS
+   ${SHARED_CORE_SOURCE_DIR}/include)
+
 include_directories(
    ${CORE_INCLUDE_DIRS}
+   ${SHARED_CORE_INCLUDE_DIRS}
    ${EXT_SOURCE_DIR}
    ${CMAKE_CURRENT_BINARY_DIR}
    ${TESTS_INCLUDE_DIR}
@@ -337,14 +302,17 @@ include_directories(
 
 # define shared library
 add_library(rstudio-core STATIC ${CORE_SOURCE_FILES} ${CORE_HEADER_FILES})
+define_source_file_names(rstudio-core)
 
 # link dependencies
-target_link_libraries(
-   rstudio-core
+target_link_libraries(rstudio-core
+   rstudio-shared-core
    rstudio-core-hunspell
    ${Boost_LIBRARIES}
    ${CRASHPAD_LIBRARIES}
+   ${SOCI_LIBRARIES}
    ${CORE_SYSTEM_LIBRARIES}
+   ${YAML_CPP_LIBRARIES}
 )
 
 # define executable (for running unit tests)
@@ -359,10 +327,12 @@ if (RSTUDIO_UNIT_TESTS_ENABLED)
    )
 
    target_link_libraries(rstudio-core-tests
+      rstudio-shared-core
       rstudio-core
       rstudio-core-synctex
       rstudio-core-hunspell
       ${Boost_LIBRARIES}
+      ${SOCI_LIBRARIES}
       ${CORE_SYSTEM_LIBRARIES}
    )
 

@@ -1,6 +1,6 @@
 /* UserPrefValues.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -64,6 +64,7 @@ namespace prefs {
 #define kPosixTerminalShell "posix_terminal_shell"
 #define kPosixTerminalShellDefault "default"
 #define kPosixTerminalShellBash "bash"
+#define kPosixTerminalShellZsh "zsh"
 #define kPosixTerminalShellCustom "custom"
 #define kPosixTerminalShellNone "none"
 #define kCustomShellCommand "custom_shell_command"
@@ -75,8 +76,11 @@ namespace prefs {
 #define kPanesQuadrants "quadrants"
 #define kPanesTabSet1 "tabSet1"
 #define kPanesTabSet2 "tabSet2"
+#define kPanesHiddenTabSet "hiddenTabSet"
 #define kPanesConsoleLeftOnTop "console_left_on_top"
 #define kPanesConsoleRightOnTop "console_right_on_top"
+#define kPanesAdditionalSourceColumns "additional_source_columns"
+#define kAllowSourceColumns "allow_source_columns"
 #define kUseSpacesForTab "use_spaces_for_tab"
 #define kNumSpacesForTab "num_spaces_for_tab"
 #define kAutoDetectIndentation "auto_detect_indentation"
@@ -86,6 +90,7 @@ namespace prefs {
 #define kShowInvisibles "show_invisibles"
 #define kShowIndentGuides "show_indent_guides"
 #define kContinueCommentsOnNewline "continue_comments_on_newline"
+#define kHighlightWebLink "highlight_web_link"
 #define kEditorKeybindings "editor_keybindings"
 #define kEditorKeybindingsDefault "default"
 #define kEditorKeybindingsVim "vim"
@@ -95,6 +100,7 @@ namespace prefs {
 #define kInsertSpacesAroundEquals "insert_spaces_around_equals"
 #define kInsertParensAfterFunctionCompletion "insert_parens_after_function_completion"
 #define kTabMultilineCompletion "tab_multiline_completion"
+#define kTabCompletion "tab_completion"
 #define kShowHelpTooltipOnIdle "show_help_tooltip_on_idle"
 #define kSurroundSelection "surround_selection"
 #define kSurroundSelectionNever "never"
@@ -133,24 +139,32 @@ namespace prefs {
 #define kReindentOnPaste "reindent_on_paste"
 #define kVerticallyAlignArgumentsIndent "vertically_align_arguments_indent"
 #define kSoftWrapRFiles "soft_wrap_r_files"
+#define kSoftWrapRmdFiles "soft_wrap_rmd_files"
 #define kFocusConsoleAfterExec "focus_console_after_exec"
 #define kFoldStyle "fold_style"
 #define kFoldStyleBeginOnly "begin-only"
 #define kFoldStyleBeginAndEnd "begin-and-end"
 #define kSaveBeforeSourcing "save_before_sourcing"
 #define kSyntaxColorConsole "syntax_color_console"
+#define kHighlightConsoleErrors "highlight_console_errors"
 #define kScrollPastEndOfDocument "scroll_past_end_of_document"
 #define kHighlightRFunctionCalls "highlight_r_function_calls"
+#define kRainbowParentheses "rainbow_parentheses"
 #define kConsoleLineLengthLimit "console_line_length_limit"
+#define kConsoleMaxLines "console_max_lines"
 #define kAnsiConsoleMode "ansi_console_mode"
 #define kAnsiConsoleModeOff "off"
 #define kAnsiConsoleModeOn "on"
 #define kAnsiConsoleModeStrip "strip"
+#define kLimitVisibleConsole "limit_visible_console"
 #define kShowInlineToolbarForRCodeChunks "show_inline_toolbar_for_r_code_chunks"
 #define kHighlightCodeChunks "highlight_code_chunks"
 #define kSaveFilesBeforeBuild "save_files_before_build"
 #define kFontSizePoints "font_size_points"
+#define kHelpFontSizePoints "help_font_size_points"
 #define kEditorTheme "editor_theme"
+#define kServerEditorFontEnabled "server_editor_font_enabled"
+#define kServerEditorFont "server_editor_font"
 #define kDefaultEncoding "default_encoding"
 #define kToolbarVisible "toolbar_visible"
 #define kDefaultProjectLocation "default_project_location"
@@ -173,8 +187,6 @@ namespace prefs {
 #define kDocumentLoadLintDelay "document_load_lint_delay"
 #define kIgnoreUppercaseWords "ignore_uppercase_words"
 #define kIgnoreWordsWithNumbers "ignore_words_with_numbers"
-#define kMaxSpellcheckWords "max_spellcheck_words"
-#define kMaxSpellcheckPrefetch "max_spellcheck_prefetch"
 #define kRealTimeSpellchecking "real_time_spellchecking"
 #define kNavigateToBuildError "navigate_to_build_error"
 #define kPackagesPaneEnabled "packages_pane_enabled"
@@ -190,6 +202,7 @@ namespace prefs {
 #define kShinyViewerTypePane "pane"
 #define kShinyViewerTypeWindow "window"
 #define kShinyViewerTypeBrowser "browser"
+#define kShinyBackgroundJobs "shiny_background_jobs"
 #define kPlumberViewerType "plumber_viewer_type"
 #define kPlumberViewerTypeUser "user"
 #define kPlumberViewerTypeNone "none"
@@ -217,11 +230,24 @@ namespace prefs {
 #define kShowTerminalTab "show_terminal_tab"
 #define kTerminalLocalEcho "terminal_local_echo"
 #define kTerminalWebsockets "terminal_websockets"
-#define kTerminalAutoClose "terminal_auto_close"
+#define kTerminalCloseBehavior "terminal_close_behavior"
+#define kTerminalCloseBehaviorAlways "always"
+#define kTerminalCloseBehaviorClean "clean"
+#define kTerminalCloseBehaviorNever "never"
 #define kTerminalTrackEnvironment "terminal_track_environment"
+#define kTerminalBellStyle "terminal_bell_style"
+#define kTerminalBellStyleNone "none"
+#define kTerminalBellStyleSound "sound"
+#define kTerminalRenderer "terminal_renderer"
+#define kTerminalRendererCanvas "canvas"
+#define kTerminalRendererDom "dom"
+#define kTerminalWeblinks "terminal_weblinks"
 #define kShowRmdRenderCommand "show_rmd_render_command"
 #define kEnableTextDrag "enable_text_drag"
 #define kShowHiddenFiles "show_hidden_files"
+#define kAlwaysShownFiles "always_shown_files"
+#define kAlwaysShownExtensions "always_shown_extensions"
+#define kSortFileNamesNaturally "sort_file_names_naturally"
 #define kJobsTabVisibility "jobs_tab_visibility"
 #define kJobsTabVisibilityClosed "closed"
 #define kJobsTabVisibilityShown "shown"
@@ -262,6 +288,7 @@ namespace prefs {
 #define kShowUserHomePageSessions "sessions"
 #define kReuseSessionsForProjectLinks "reuse_sessions_for_project_links"
 #define kVcsEnabled "vcs_enabled"
+#define kVcsAutorefresh "vcs_autorefresh"
 #define kGitExePath "git_exe_path"
 #define kSvnExePath "svn_exe_path"
 #define kTerminalPath "terminal_path"
@@ -273,6 +300,8 @@ namespace prefs {
 #define kViewDirAfterRCmdCheck "view_dir_after_r_cmd_check"
 #define kHideObjectFiles "hide_object_files"
 #define kRestoreLastProject "restore_last_project"
+#define kProjectSafeStartupSeconds "project_safe_startup_seconds"
+#define kUseTinytex "use_tinytex"
 #define kCleanTexi2dviOutput "clean_texi2dvi_output"
 #define kLatexShellEscape "latex_shell_escape"
 #define kRestoreProjectRVersion "restore_project_r_version"
@@ -282,6 +311,81 @@ namespace prefs {
 #define kDefaultRVersionVersion "version"
 #define kDefaultRVersionRHome "r_home"
 #define kDefaultRVersionLabel "label"
+#define kDataViewerMaxColumns "data_viewer_max_columns"
+#define kEnableScreenReader "enable_screen_reader"
+#define kTypingStatusDelayMs "typing_status_delay_ms"
+#define kReducedMotion "reduced_motion"
+#define kTabKeyMoveFocus "tab_key_move_focus"
+#define kFindPanelLegacyTabSequence "find_panel_legacy_tab_sequence"
+#define kShowFocusRectangles "show_focus_rectangles"
+#define kShowPanelFocusRectangle "show_panel_focus_rectangle"
+#define kAutoSaveOnIdle "auto_save_on_idle"
+#define kAutoSaveOnIdleCommit "commit"
+#define kAutoSaveOnIdleBackup "backup"
+#define kAutoSaveOnIdleNone "none"
+#define kAutoSaveIdleMs "auto_save_idle_ms"
+#define kAutoSaveOnBlur "auto_save_on_blur"
+#define kTerminalInitialDirectory "terminal_initial_directory"
+#define kTerminalInitialDirectoryProject "project"
+#define kTerminalInitialDirectoryCurrent "current"
+#define kTerminalInitialDirectoryHome "home"
+#define kFullProjectPathInWindowTitle "full_project_path_in_window_title"
+#define kVisualMarkdownEditingIsDefault "visual_markdown_editing_is_default"
+#define kVisualMarkdownEditingListSpacing "visual_markdown_editing_list_spacing"
+#define kVisualMarkdownEditingListSpacingTight "tight"
+#define kVisualMarkdownEditingListSpacingSpaced "spaced"
+#define kVisualMarkdownEditingWrap "visual_markdown_editing_wrap"
+#define kVisualMarkdownEditingWrapNone "none"
+#define kVisualMarkdownEditingWrapColumn "column"
+#define kVisualMarkdownEditingWrapSentence "sentence"
+#define kVisualMarkdownEditingWrapAtColumn "visual_markdown_editing_wrap_at_column"
+#define kVisualMarkdownEditingReferencesLocation "visual_markdown_editing_references_location"
+#define kVisualMarkdownEditingReferencesLocationBlock "block"
+#define kVisualMarkdownEditingReferencesLocationSection "section"
+#define kVisualMarkdownEditingReferencesLocationDocument "document"
+#define kVisualMarkdownEditingCanonical "visual_markdown_editing_canonical"
+#define kVisualMarkdownEditingMaxContentWidth "visual_markdown_editing_max_content_width"
+#define kVisualMarkdownEditingShowDocOutline "visual_markdown_editing_show_doc_outline"
+#define kVisualMarkdownEditingShowMargin "visual_markdown_editing_show_margin"
+#define kVisualMarkdownEditingFontSizePoints "visual_markdown_editing_font_size_points"
+#define kVisualMarkdownCodeEditor "visual_markdown_code_editor"
+#define kVisualMarkdownCodeEditorAce "ace"
+#define kVisualMarkdownCodeEditorCodemirror "codemirror"
+#define kZoteroLibraries "zotero_libraries"
+#define kEmojiSkintone "emoji_skintone"
+#define kEmojiSkintoneNone_ "(None)"
+#define kEmojiSkintoneDefault_ "(Default)"
+#define kEmojiSkintoneLight "Light"
+#define kEmojiSkintoneMediumLight "Medium-Light"
+#define kEmojiSkintoneMedium "Medium"
+#define kEmojiSkintoneMediumDark "Medium-Dark"
+#define kEmojiSkintoneDark "Dark"
+#define kDisabledAriaLiveAnnouncements "disabled_aria_live_announcements"
+#define kScreenreaderConsoleAnnounceLimit "screenreader_console_announce_limit"
+#define kFileMonitorIgnoredComponents "file_monitor_ignored_components"
+#define kInstallPkgDepsIndividually "install_pkg_deps_individually"
+#define kGraphicsBackend "graphics_backend"
+#define kGraphicsBackendDefault "default"
+#define kGraphicsBackendCairo "cairo"
+#define kGraphicsBackendCairoPng "cairo-png"
+#define kGraphicsBackendQuartz "quartz"
+#define kGraphicsBackendWindows "windows"
+#define kGraphicsBackendRagg "ragg"
+#define kGraphicsAntialiasing "graphics_antialiasing"
+#define kGraphicsAntialiasingDefault "default"
+#define kGraphicsAntialiasingNone "none"
+#define kGraphicsAntialiasingGray "gray"
+#define kGraphicsAntialiasingSubpixel "subpixel"
+#define kBrowserFixedWidthFonts "browser_fixed_width_fonts"
+#define kPythonType "python_type"
+#define kPythonVersion "python_version"
+#define kPythonPath "python_path"
+#define kSaveRetryTimeout "save_retry_timeout"
+#define kInsertNativePipeOperator "insert_native_pipe_operator"
+#define kCommandPaletteMru "command_palette_mru"
+#define kShowMemoryUsage "show_memory_usage"
+#define kMemoryQueryIntervalSeconds "memory_query_interval_seconds"
+#define kTerminalPythonIntegration "terminal_python_integration"
 
 class UserPrefValues: public Preferences
 {
@@ -294,7 +398,7 @@ public:
    core::Error setRunRprofileOnResume(bool val);
 
    /**
-    * Whether to save the workspace after the R session ends.
+    * Whether to save the workspace to an .Rdata file after the R session ends.
     */
    std::string saveWorkspace();
    core::Error setSaveWorkspace(std::string val);
@@ -408,6 +512,12 @@ public:
    core::Error setPanes(core::json::Object val);
 
    /**
+    * Whether to enable the ability to add source columns to display.
+    */
+   bool allowSourceColumns();
+   core::Error setAllowSourceColumns(bool val);
+
+   /**
     * Whether to insert spaces when pressing the Tab key.
     */
    bool useSpacesForTab();
@@ -462,6 +572,12 @@ public:
    core::Error setContinueCommentsOnNewline(bool val);
 
    /**
+    * Whether web links in comments are clickable.
+    */
+   bool highlightWebLink();
+   core::Error setHighlightWebLink(bool val);
+
+   /**
     * The keybindings to use in the RStudio code editor.
     */
    std::string editorKeybindings();
@@ -490,6 +606,12 @@ public:
     */
    bool tabMultilineCompletion();
    core::Error setTabMultilineCompletion(bool val);
+
+   /**
+    * Whether to attempt completion of statements when pressing Tab.
+    */
+   bool tabCompletion();
+   core::Error setTabCompletion(bool val);
 
    /**
     * Whether to show help tooltips for functions when the cursor has not been recently moved.
@@ -618,7 +740,7 @@ public:
    core::Error setWarnVariableDefinedButNotUsed(bool val);
 
    /**
-    * Whether to automatically discover and offer to install missing R package dependenices.
+    * Whether to automatically discover and offer to install missing R package dependencies.
     */
    bool autoDiscoverPackageDependencies();
    core::Error setAutoDiscoverPackageDependencies(bool val);
@@ -636,7 +758,7 @@ public:
    core::Error setStripTrailingWhitespace(bool val);
 
    /**
-    * Whether to save the position of the cursor when a fille is closed, restore it when the file is opened.
+    * Whether to save the position of the cursor when a file is closed, restore it when the file is opened.
     */
    bool restoreSourceDocumentCursorPosition();
    core::Error setRestoreSourceDocumentCursorPosition(bool val);
@@ -658,6 +780,12 @@ public:
     */
    bool softWrapRFiles();
    core::Error setSoftWrapRFiles(bool val);
+
+   /**
+    * Whether to soft-wrap R Markdown files (and similar types such as R HTML and R Notebooks)
+    */
+   bool softWrapRmdFiles();
+   core::Error setSoftWrapRmdFiles(bool val);
 
    /**
     * Whether to focus the R console after executing an R command from a script.
@@ -684,6 +812,12 @@ public:
    core::Error setSyntaxColorConsole(bool val);
 
    /**
+    * Whether to display error, warning, and message output in a different color.
+    */
+   bool highlightConsoleErrors();
+   core::Error setHighlightConsoleErrors(bool val);
+
+   /**
     * Whether to allow scrolling past the end of a file.
     */
    bool scrollPastEndOfDocument();
@@ -696,16 +830,34 @@ public:
    core::Error setHighlightRFunctionCalls(bool val);
 
    /**
+    * Whether to highlight parentheses in a variety of colors.
+    */
+   bool rainbowParentheses();
+   core::Error setRainbowParentheses(bool val);
+
+   /**
     * The maximum number of characters to display in a single line in the R console.
     */
    int consoleLineLengthLimit();
    core::Error setConsoleLineLengthLimit(int val);
 
    /**
+    * The maximum number of console actions to store and display in the console scrollback buffer.
+    */
+   int consoleMaxLines();
+   core::Error setConsoleMaxLines(int val);
+
+   /**
     * How to treat ANSI escape codes in the console.
     */
    std::string ansiConsoleMode();
    core::Error setAnsiConsoleMode(std::string val);
+
+   /**
+    * Whether to only show a limited window of the total console output
+    */
+   bool limitVisibleConsole();
+   core::Error setLimitVisibleConsole(bool val);
 
    /**
     * Whether to show a toolbar on code chunks in R Markdown documents.
@@ -732,10 +884,28 @@ public:
    core::Error setFontSizePoints(double val);
 
    /**
+    * The help panel font size, in points.
+    */
+   double helpFontSizePoints();
+   core::Error setHelpFontSizePoints(double val);
+
+   /**
     * The name of the color theme to apply to the text editor in RStudio.
     */
    std::string editorTheme();
    core::Error setEditorTheme(std::string val);
+
+   /**
+    * Whether to use a custom editor font in RStudio Server.
+    */
+   bool serverEditorFontEnabled();
+   core::Error setServerEditorFontEnabled(bool val);
+
+   /**
+    * The name of the fixed-width editor font to use with RStudio Server.
+    */
+   std::string serverEditorFont();
+   core::Error setServerEditorFont(std::string val);
 
    /**
     * The default character encoding to use when saving files.
@@ -840,18 +1010,6 @@ public:
    core::Error setIgnoreWordsWithNumbers(bool val);
 
    /**
-    * The maximum number of spelling words to check at once.
-    */
-   int maxSpellcheckWords();
-   core::Error setMaxSpellcheckWords(int val);
-
-   /**
-    * The maximum number of spelling correction suggestions to prefetch.
-    */
-   int maxSpellcheckPrefetch();
-   core::Error setMaxSpellcheckPrefetch(int val);
-
-   /**
     * Whether to enable real-time spellchecking by default.
     */
    bool realTimeSpellchecking();
@@ -910,6 +1068,12 @@ public:
     */
    std::string shinyViewerType();
    core::Error setShinyViewerType(std::string val);
+
+   /**
+    * Whether to run Shiny applications as background jobs.
+    */
+   bool shinyBackgroundJobs();
+   core::Error setShinyBackgroundJobs(bool val);
 
    /**
     * Where to display Shiny applications when they are run.
@@ -1008,16 +1172,34 @@ public:
    core::Error setTerminalWebsockets(bool val);
 
    /**
-    * Whether to automatically close the Terminal tab.
+    * Whether to close the terminal pane after the shell exits.
     */
-   bool terminalAutoClose();
-   core::Error setTerminalAutoClose(bool val);
+   std::string terminalCloseBehavior();
+   core::Error setTerminalCloseBehavior(std::string val);
 
    /**
     * Whether to track and save changes to system environment variables in the Terminal.
     */
    bool terminalTrackEnvironment();
    core::Error setTerminalTrackEnvironment(bool val);
+
+   /**
+    * Terminal bell style
+    */
+   std::string terminalBellStyle();
+   core::Error setTerminalBellStyle(std::string val);
+
+   /**
+    * Terminal rendering engine: canvas is faster, dom may be needed for some browsers or graphics cards
+    */
+   std::string terminalRenderer();
+   core::Error setTerminalRenderer(std::string val);
+
+   /**
+    * Whether web links displayed in the Terminal tab are made clickable.
+    */
+   bool terminalWeblinks();
+   core::Error setTerminalWeblinks(bool val);
 
    /**
     * Whether to print the render command use to knit R Markdown documents in the R Markdown tab.
@@ -1038,19 +1220,37 @@ public:
    core::Error setShowHiddenFiles(bool val);
 
    /**
+    * List of file names (case sensitive) that are always shown in the Files Pane, regardless of whether hidden files are shown
+    */
+   core::json::Array alwaysShownFiles();
+   core::Error setAlwaysShownFiles(core::json::Array val);
+
+   /**
+    * List of file extensions (beginning with ., not case sensitive) that are always shown in the Files Pane, regardless of whether hidden files are shown
+    */
+   core::json::Array alwaysShownExtensions();
+   core::Error setAlwaysShownExtensions(core::json::Array val);
+
+   /**
+    * Whether to sort file names naturally, so that e.g., file10.R comes after file9.R
+    */
+   bool sortFileNamesNaturally();
+   core::Error setSortFileNamesNaturally(bool val);
+
+   /**
     * The visibility of the Jobs tab.
     */
    std::string jobsTabVisibility();
    core::Error setJobsTabVisibility(std::string val);
 
    /**
-    * Whether to show the Launcher jobs tab in RStudio Pro.
+    * Whether to show the Launcher jobs tab in RStudio Pro and RStudio Workbench.
     */
    bool showLauncherJobsTab();
    core::Error setShowLauncherJobsTab(bool val);
 
    /**
-    * How to sort jobs in the Launcher tab in RStudio Pro.
+    * How to sort jobs in the Launcher tab in RStudio Pro and RStudio Workbench.
     */
    std::string launcherJobsSort();
    core::Error setLauncherJobsSort(std::string val);
@@ -1122,13 +1322,13 @@ public:
    core::Error setRootDocument(std::string val);
 
    /**
-    * When to show the server home page in RStudio Server Pro.
+    * When to show the server home page in RStudio Workbench.
     */
    std::string showUserHomePage();
    core::Error setShowUserHomePage(std::string val);
 
    /**
-    * Whether to reuse sessions when opening projects in RStudio Server Pro.
+    * Whether to reuse sessions when opening projects in RStudio Workbench.
     */
    bool reuseSessionsForProjectLinks();
    core::Error setReuseSessionsForProjectLinks(bool val);
@@ -1138,6 +1338,12 @@ public:
     */
    bool vcsEnabled();
    core::Error setVcsEnabled(bool val);
+
+   /**
+    * Automatically refresh VCS status?
+    */
+   bool vcsAutorefresh();
+   core::Error setVcsAutorefresh(bool val);
 
    /**
     * The path to the Git executable to use.
@@ -1206,6 +1412,18 @@ public:
    core::Error setRestoreLastProject(bool val);
 
    /**
+    * The number of seconds after which a project is deemed to have successfully started.
+    */
+   int projectSafeStartupSeconds();
+   core::Error setProjectSafeStartupSeconds(int val);
+
+   /**
+    * Use tinytex to compile .tex files.
+    */
+   bool useTinytex();
+   core::Error setUseTinytex(bool val);
+
+   /**
     * Whether to clean output after running Texi2Dvi.
     */
    bool cleanTexi2dviOutput();
@@ -1218,7 +1436,7 @@ public:
    core::Error setLatexShellEscape(bool val);
 
    /**
-    * Whether to restore the last version of R used by the project in RStudio Pro.
+    * Whether to restore the last version of R used by the project in RStudio Pro and RStudio Workbench.
     */
    bool restoreProjectRVersion();
    core::Error setRestoreProjectRVersion(bool val);
@@ -1240,6 +1458,258 @@ public:
     */
    core::json::Object defaultRVersion();
    core::Error setDefaultRVersion(core::json::Object val);
+
+   /**
+    * The maximum number of columns to show at once in the data viewer.
+    */
+   int dataViewerMaxColumns();
+   core::Error setDataViewerMaxColumns(int val);
+
+   /**
+    * Support accessibility aids such as screen readers (RStudio Server).
+    */
+   bool enableScreenReader();
+   core::Error setEnableScreenReader(bool val);
+
+   /**
+    * Number of milliseconds to wait after last keystroke before updating live region.
+    */
+   int typingStatusDelayMs();
+   core::Error setTypingStatusDelayMs(int val);
+
+   /**
+    * Reduce use of animations in the user interface.
+    */
+   bool reducedMotion();
+   core::Error setReducedMotion(bool val);
+
+   /**
+    * Tab key moves focus out of text editing controls instead of inserting tabs.
+    */
+   bool tabKeyMoveFocus();
+   core::Error setTabKeyMoveFocus(bool val);
+
+   /**
+    * In source editor find panel, tab key moves focus directly from find text to replace text.
+    */
+   bool findPanelLegacyTabSequence();
+   core::Error setFindPanelLegacyTabSequence(bool val);
+
+   /**
+    * Control with keyboard focus displays a visual focus indicator.
+    */
+   bool showFocusRectangles();
+   core::Error setShowFocusRectangles(bool val);
+
+   /**
+    * Show which panel contains keyboard focus.
+    */
+   bool showPanelFocusRectangle();
+   core::Error setShowPanelFocusRectangle(bool val);
+
+   /**
+    * How to deal with changes to documents on idle.
+    */
+   std::string autoSaveOnIdle();
+   core::Error setAutoSaveOnIdle(std::string val);
+
+   /**
+    * The idle period, in milliseconds, after which documents should be auto-saved.
+    */
+   int autoSaveIdleMs();
+   core::Error setAutoSaveIdleMs(int val);
+
+   /**
+    * Whether to automatically save when the editor loses focus.
+    */
+   bool autoSaveOnBlur();
+   core::Error setAutoSaveOnBlur(bool val);
+
+   /**
+    * Initial directory for new terminals.
+    */
+   std::string terminalInitialDirectory();
+   core::Error setTerminalInitialDirectory(std::string val);
+
+   /**
+    * Whether to show the full path to project in desktop window title.
+    */
+   bool fullProjectPathInWindowTitle();
+   core::Error setFullProjectPathInWindowTitle(bool val);
+
+   /**
+    * Whether to enable visual editing by default for new markdown documents
+    */
+   bool visualMarkdownEditingIsDefault();
+   core::Error setVisualMarkdownEditingIsDefault(bool val);
+
+   /**
+    * Default spacing for lists created in the visual editor
+    */
+   std::string visualMarkdownEditingListSpacing();
+   core::Error setVisualMarkdownEditingListSpacing(std::string val);
+
+   /**
+    * Whether to automatically wrap text when writing markdown
+    */
+   std::string visualMarkdownEditingWrap();
+   core::Error setVisualMarkdownEditingWrap(std::string val);
+
+   /**
+    * The column to wrap text at when writing markdown
+    */
+   int visualMarkdownEditingWrapAtColumn();
+   core::Error setVisualMarkdownEditingWrapAtColumn(int val);
+
+   /**
+    * Placement of footnotes within markdown output.
+    */
+   std::string visualMarkdownEditingReferencesLocation();
+   core::Error setVisualMarkdownEditingReferencesLocation(std::string val);
+
+   /**
+    * Whether to write canonical visual mode markdown when saving from source mode.
+    */
+   bool visualMarkdownEditingCanonical();
+   core::Error setVisualMarkdownEditingCanonical(bool val);
+
+   /**
+    * Maximum content width for visual editing mode, in pixels
+    */
+   int visualMarkdownEditingMaxContentWidth();
+   core::Error setVisualMarkdownEditingMaxContentWidth(int val);
+
+   /**
+    * Whether to show the document outline by default when opening R Markdown documents in visual mode.
+    */
+   bool visualMarkdownEditingShowDocOutline();
+   core::Error setVisualMarkdownEditingShowDocOutline(bool val);
+
+   /**
+    * Whether to show the margin guide in the visual mode code blocks.
+    */
+   bool visualMarkdownEditingShowMargin();
+   core::Error setVisualMarkdownEditingShowMargin(bool val);
+
+   /**
+    * The default visual editing mode font size, in points
+    */
+   int visualMarkdownEditingFontSizePoints();
+   core::Error setVisualMarkdownEditingFontSizePoints(int val);
+
+   /**
+    * The name of the editor to use to provide code editing in visual mode
+    */
+   std::string visualMarkdownCodeEditor();
+   core::Error setVisualMarkdownCodeEditor(std::string val);
+
+   /**
+    * Zotero libraries to insert citations from.
+    */
+   core::json::Array zoteroLibraries();
+   core::Error setZoteroLibraries(core::json::Array val);
+
+   /**
+    * Preferred emoji skintone
+    */
+   std::string emojiSkintone();
+   core::Error setEmojiSkintone(std::string val);
+
+   /**
+    * List of aria-live announcements to disable.
+    */
+   core::json::Array disabledAriaLiveAnnouncements();
+   core::Error setDisabledAriaLiveAnnouncements(core::json::Array val);
+
+   /**
+    * Maximum number of lines of console output announced after a command.
+    */
+   int screenreaderConsoleAnnounceLimit();
+   core::Error setScreenreaderConsoleAnnounceLimit(int val);
+
+   /**
+    * List of path components; file monitor will ignore paths containing one or more of these components.
+    */
+   core::json::Array fileMonitorIgnoredComponents();
+   core::Error setFileMonitorIgnoredComponents(core::json::Array val);
+
+   /**
+    * Whether to install R package dependencies one at a time.
+    */
+   bool installPkgDepsIndividually();
+   core::Error setInstallPkgDepsIndividually(bool val);
+
+   /**
+    * R graphics backend.
+    */
+   std::string graphicsBackend();
+   core::Error setGraphicsBackend(std::string val);
+
+   /**
+    * Type of anti-aliasing to be used for generated R plots.
+    */
+   std::string graphicsAntialiasing();
+   core::Error setGraphicsAntialiasing(std::string val);
+
+   /**
+    * List of fixed-width fonts to check for browser support.
+    */
+   core::json::Array browserFixedWidthFonts();
+   core::Error setBrowserFixedWidthFonts(core::json::Array val);
+
+   /**
+    * The Python type.
+    */
+   std::string pythonType();
+   core::Error setPythonType(std::string val);
+
+   /**
+    * The Python version.
+    */
+   std::string pythonVersion();
+   core::Error setPythonVersion(std::string val);
+
+   /**
+    * The path to the default Python interpreter.
+    */
+   std::string pythonPath();
+   core::Error setPythonPath(std::string val);
+
+   /**
+    * The maximum amount of seconds of retry for save operations.
+    */
+   int saveRetryTimeout();
+   core::Error setSaveRetryTimeout(int val);
+
+   /**
+    * Whether the Insert Pipe Operator command should insert the native R pipe operator, |>
+    */
+   bool insertNativePipeOperator();
+   core::Error setInsertNativePipeOperator(bool val);
+
+   /**
+    * Whether to keep track of recently used commands in the Command Palette
+    */
+   bool commandPaletteMru();
+   core::Error setCommandPaletteMru(bool val);
+
+   /**
+    * Whether to compute and show memory usage in the Environment Pane
+    */
+   bool showMemoryUsage();
+   core::Error setShowMemoryUsage(bool val);
+
+   /**
+    * How many seconds to wait between automatic requeries of memory statistics (0 to disable)
+    */
+   int memoryQueryIntervalSeconds();
+   core::Error setMemoryQueryIntervalSeconds(int val);
+
+   /**
+    * Enable Python terminal hooks. When enabled, the RStudio-configured version of Python will be placed on the PATH.
+    */
+   bool terminalPythonIntegration();
+   core::Error setTerminalPythonIntegration(bool val);
 
 };
 

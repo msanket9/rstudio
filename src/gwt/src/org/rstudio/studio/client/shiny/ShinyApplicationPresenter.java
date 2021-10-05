@@ -1,7 +1,7 @@
 /*
  * ShinyApplicationPresenter.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -166,6 +166,8 @@ public class ShinyApplicationPresenter implements
       
       ShinyApplicationParams params = ShinyApplicationParams.create(
             params_.getPath(), 
+            ShinyApplicationSatellite.getIdFromName(
+                  satellite_.getSatelliteName()),
             params_.getUrl(), 
             appStopped_ ?
                ShinyApplicationParams.STATE_STOPPED :

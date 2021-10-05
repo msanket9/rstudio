@@ -1,7 +1,7 @@
 /*
  * DesktopPosixApplicationLaunch.cpp
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -65,7 +65,8 @@ protected:
           event->type() == QEvent::MouseButtonRelease)
       {
          QMouseEvent* mouseEvent = static_cast<QMouseEvent*>(event);
-         if (mouseEvent->buttons() == Qt::NoButton)
+         if (mouseEvent->button() != Qt::NoButton &&
+             mouseEvent->buttons() == Qt::NoButton)
          {
             QMouseEvent* fixedMouseEvent = new QMouseEvent(
                      mouseEvent->type(),
@@ -204,7 +205,7 @@ void ApplicationLaunch::launchRStudio(const std::vector<std::string>& args,
    }
 
    QString exePath = QString::fromUtf8(
-      desktop::options().executablePath().absolutePath().c_str());
+      desktop::options().executablePath().getAbsolutePath().c_str());
 
    // temporarily restore the library path to the one we were launched with
    std::string ldPath = core::system::getenv("LD_LIBRARY_PATH");

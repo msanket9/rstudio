@@ -1,7 +1,7 @@
 /*
  * SessionReticulate.cpp
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,16 +17,18 @@
 
 #include "SessionThemes.hpp"
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Exec.hpp>
 
 #include <r/RExec.hpp>
+#include <r/RRoutines.hpp>
 
 #include <session/SessionModuleContext.hpp>
 
 using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace session {
@@ -34,6 +36,24 @@ namespace modules {
 namespace reticulate {
 
 namespace {
+
+// has the Python session been initialized by reticulate yet?
+bool s_pythonInitialized = false;
+
+SEXP rs_reticulateInitialized()
+{
+   // set initialized flag
+   s_pythonInitialized = true;
+   
+   // Python will register its own console control handler,
+   // which also blocks signals from reaching any previously
+   // defined handlers (including RStudio's own). re-initialize
+   // RStudio's console control handler here to ensure that
+   // interrupts are still handled by R as expected
+   module_context::initializeConsoleCtrlHandler();
+
+   return R_NilValue;
+}
 
 void onDeferredInit(bool)
 {
@@ -43,6 +63,12 @@ void onDeferredInit(bool)
 }
 
 } // end anonymous namespace
+
+bool isPythonInitialized()
+{
+   return s_pythonInitialized;
+}
+
 bool isReplActive()
 {
    bool active = false;
@@ -57,7 +83,9 @@ Error initialize()
    using namespace module_context;
    
    events().onDeferredInit.connect(onDeferredInit);
-   
+
+   RS_REGISTER_CALL_METHOD(rs_reticulateInitialized);
+
    ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(sourceModuleRFile, "SessionReticulate.R"));
@@ -67,5 +95,15 @@ Error initialize()
 
 } // end namespace reticulate
 } // end namespace modules
+
+namespace module_context {
+
+bool isPythonReplActive()
+{
+   return modules::reticulate::isReplActive();
+}
+
+} // end namespace module_context
+
 } // end namespace session
 } // end namespace rstudio

@@ -1,7 +1,7 @@
 /*
  * UserState.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,6 +18,7 @@ import com.google.gwt.core.client.JsArray;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 
+import org.rstudio.core.client.CommandWithArg;
 import org.rstudio.core.client.Debug;
 import org.rstudio.studio.client.RStudioGinjector;
 import org.rstudio.studio.client.application.events.EventBus;
@@ -26,8 +27,6 @@ import org.rstudio.studio.client.common.satellite.SatelliteManager;
 import org.rstudio.studio.client.server.ServerError;
 import org.rstudio.studio.client.server.ServerRequestCallback;
 import org.rstudio.studio.client.server.Void;
-import org.rstudio.studio.client.workbench.events.SessionInitEvent;
-import org.rstudio.studio.client.workbench.events.SessionInitHandler;
 import org.rstudio.studio.client.workbench.model.Session;
 import org.rstudio.studio.client.workbench.prefs.events.UserStateChangedEvent;
 
@@ -54,6 +53,12 @@ public class UserState extends UserStateAccessor implements UserStateChangedEven
    
    public void writeState()
    {
+      writeState(null);
+   }
+
+   public void writeState(CommandWithArg<Boolean> onCompleted)
+   {
+      updatePrefs(session_.getSessionInfo().getUserState());
       server_.setUserState(
          session_.getSessionInfo().getUserStateLayer().getValues(),
          new ServerRequestCallback<Void>() 
@@ -73,6 +78,10 @@ public class UserState extends UserStateAccessor implements UserStateChangedEven
                {
                   // let satellites know prefs have changed
                   satelliteManager_.dispatchCrossWindowEvent(event);
+               }
+               if (onCompleted != null)
+               {
+                  onCompleted.execute(true);
                }
             }
             @Override

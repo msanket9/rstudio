@@ -1,7 +1,7 @@
 /*
  * FileMonitor.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,11 +18,11 @@
 
 #include <list>
 
-#include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/bind/bind.hpp>
 
 #include <core/Log.hpp>
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Thread.hpp>
 #include <core/PeriodicCommand.hpp>
 
@@ -35,6 +35,8 @@
 // in theory cause us to lose notifications on Win32 and OS X however in
 // practice we can't think of an easy way for the user to specify the
 // non case-sensitive variant of a file
+
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace core {
@@ -418,7 +420,8 @@ public:
 
 public:
    RegistrationCommand()
-      : type_(None)
+      : type_(None),
+        recursive_(false)
    {
    }
 
@@ -542,7 +545,7 @@ void fileMonitorThreadMain()
 
       // now run the monitoring thread
       running = true;
-      file_monitor::detail::run(boost::bind(checkForInput));   
+      file_monitor::detail::run(boost::bind(checkForInput));
    }
    catch(const boost::thread_interrupted&)
    {

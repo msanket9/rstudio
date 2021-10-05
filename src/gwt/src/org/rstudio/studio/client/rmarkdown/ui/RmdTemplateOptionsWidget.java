@@ -1,7 +1,7 @@
 /*
  * RmdTemplateOptionsWidget.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -19,7 +19,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.gwt.aria.client.Id;
+import com.google.gwt.aria.client.Roles;
 import com.google.gwt.dom.client.Style;
+import com.google.gwt.user.client.DOM;
 import org.rstudio.core.client.JsArrayUtil;
 import org.rstudio.core.client.files.FileSystemItem;
 import org.rstudio.core.client.theme.res.ThemeResources;
@@ -167,7 +170,7 @@ public class RmdTemplateOptionsWidget extends Composite
    
    private void updateFormatOptions(String format)
    {
-      tabs_ = new HashMap<String, FlowPanel>();
+      tabs_ = new HashMap<>();
       optionsTabs_.clear();
       for (int i = 0; i < formats_.length(); i++)
       {
@@ -190,7 +193,7 @@ public class RmdTemplateOptionsWidget extends Composite
       {
          labelFormatNotes_.setVisible(false);
       }
-      optionWidgets_ = new ArrayList<RmdFormatOption>();
+      optionWidgets_ = new ArrayList<>();
       JsArrayString options = format.getOptions();
       for (int i = 0; i < options.length(); i++)
       {
@@ -227,6 +230,13 @@ public class RmdTemplateOptionsWidget extends Composite
             panel = new FlowPanel();
             scrollPanel.add(panel);
             optionsTabs_.add(scrollPanel, new Label(category));
+
+            // associate tabpanel widget with controlling tab
+            Roles.getTabpanelRole().set(scrollPanel.getElement());
+            String tabId = DOM.createUniqueId();
+            optionsTabs_.setTabId(scrollPanel, tabId);
+            Roles.getTabpanelRole().setAriaLabelledbyProperty(scrollPanel.getElement(), Id.of(tabId));
+
             tabs_.put(category, panel);
          }
 
@@ -310,7 +320,7 @@ public class RmdTemplateOptionsWidget extends Composite
    private void applyFrontMatter(RmdFrontMatter frontMatter)
    {
       frontMatter_ = frontMatter;
-      frontMatterCache_ = new HashMap<String, String>();
+      frontMatterCache_ = new HashMap<>();
       ensureOptionsCache();
       JsArrayString formats = frontMatter.getFormatList();
       for (int i = 0; i < formats.length(); i++)
@@ -369,7 +379,7 @@ public class RmdTemplateOptionsWidget extends Composite
    {
       if (optionCache_ != null)
          return;
-      optionCache_ = new HashMap<String, RmdTemplateFormatOption>();
+      optionCache_ = new HashMap<>();
       for (int i = 0; i < options_.length(); i++)
       {
          RmdTemplateFormatOption option = options_.get(i);

@@ -1,7 +1,7 @@
 /*
  * SessionRVersions.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -41,7 +41,7 @@ void syncRVersionPref()
                                              kSessionSharedStoragePath)));
 
    auto value = prefs::userPrefs().readValue(kDefaultRVersion);
-   if (!value || value->type() != json::ObjectType)
+   if (!value || value->getType() != json::Type::OBJECT)
    {
       // No work to do if preference isn't actually defined
       return;
@@ -49,10 +49,10 @@ void syncRVersionPref()
 
    // Load values from prefs
    std::string version, home, label;
-   Error error = json::readObject(value->get_obj(), 
-         kDefaultRVersionVersion, &version,
-         kDefaultRVersionRHome,   &home,
-         kDefaultRVersionLabel,   &label);
+   Error error = json::readObject(value->getObject(),
+         kDefaultRVersionVersion, version,
+         kDefaultRVersionRHome,   home,
+         kDefaultRVersionLabel,   label);
    if (error)
    {
       // Should not happen when preferences are valid according to schema

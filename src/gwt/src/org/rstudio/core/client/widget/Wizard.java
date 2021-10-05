@@ -1,7 +1,7 @@
 /*
  * Wizard.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -37,6 +37,7 @@ import com.google.gwt.user.client.ui.Label;
 import com.google.gwt.user.client.ui.LayoutPanel;
 import com.google.gwt.user.client.ui.VerticalPanel;
 import com.google.gwt.user.client.ui.Widget;
+import org.rstudio.studio.client.RStudioGinjector;
 
 
 public class Wizard<I,T> extends ModalDialog<T>
@@ -354,8 +355,9 @@ public class Wizard<I,T> extends ModalDialog<T>
                                     width, Unit.PX);
       
       isAnimating_ = true;
-     
-      bodyPanel_.animate(300, new AnimationCallback()
+
+      int duration = (RStudioGinjector.INSTANCE.getUserPrefs().reducedMotion().getValue() ? 0 : 300);
+      bodyPanel_.animate(duration, new AnimationCallback()
       {
          @Override
          public void onAnimationComplete()
@@ -495,7 +497,7 @@ public class Wizard<I,T> extends ModalDialog<T>
     
    protected ArrayList<String> getWizardBodyStyles()
    {
-      ArrayList<String> classes = new ArrayList<String>();
+      ArrayList<String> classes = new ArrayList<>();
       classes.add(WizardResources.INSTANCE.styles().wizardBodyPanel());
       return classes;
    }

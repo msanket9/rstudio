@@ -1,7 +1,7 @@
 /*
  * ProcessTests.cpp
  *
- * Copyright (C) 2017-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,17 +16,20 @@
 #ifndef _WIN32
 
 #include <atomic>
+#include <signal.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/thread.hpp>
 
-#include <core/SafeConvert.hpp>
+#include <shared_core/SafeConvert.hpp>
 #include <core/system/PosixProcess.hpp>
 #include <core/system/PosixChildProcess.hpp>
 #include <core/system/PosixSystem.hpp>
 #include <core/Thread.hpp>
 
 #include <tests/TestThat.hpp>
+
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace core {
@@ -277,6 +280,7 @@ test_context("ProcessTests")
 
       // wait for processes to exit
       bool success = supervisor.wait();
+      CHECK(success);
 
       // verify correct exit statuses and outputs
       for (int i = 0; i < 10; ++i)
@@ -292,15 +296,15 @@ test_context("ProcessTests")
 
       std::string asioType;
       #if defined(BOOST_ASIO_HAS_IOCP)
-        asioType = "iocp" ;
+        asioType = "iocp";
       #elif defined(BOOST_ASIO_HAS_EPOLL)
-        asioType = "epoll" ;
+        asioType = "epoll";
       #elif defined(BOOST_ASIO_HAS_KQUEUE)
-        asioType = "kqueue" ;
+        asioType = "kqueue";
       #elif defined(BOOST_ASIO_HAS_DEV_POLL)
-        asioType = "/dev/poll" ;
+        asioType = "/dev/poll";
       #else
-        asioType = "select" ;
+        asioType = "select";
       #endif
       std::cout << "Using asio type: " << asioType << std::endl;
 
@@ -359,7 +363,7 @@ test_context("ProcessTests")
       }
 
       if (lastError)
-         std::cout << lastError.summary() << " " << lastError.location().asString() << std::endl;
+         std::cout << lastError.getSummary() << " " << lastError.getLocation().asString() << std::endl;
 
       CHECK(numError == 0);
 
@@ -376,6 +380,215 @@ test_context("ProcessTests")
          CHECK(exitCodes[i] == 0);
          CHECK(outputs[i] == "Hello, " + safe_convert::numberToString(i) + "\n");
       }
+   }
+
+   test_that("Can kill child processes")
+   {
+      IoServiceFixture fixture;
+
+      // create new supervisor
+      AsioProcessSupervisor supervisor(fixture.ioService);
+
+      std::atomic<int> numStarted(0);
+      std::atomic<int> numExited(0);
+      int numError = 0;
+
+      Error lastError;
+      for (int i = 0; i < 10; ++i)
+      {
+         // create process options and callbacks
+         ProcessOptions options;
+         options.threadSafe = true;
+
+         ProcessCallbacks callbacks;
+
+         callbacks.onStdout = [&numStarted](ProcessOperations&, const std::string& out) {
+            ++numStarted;
+         };
+
+         callbacks.onExit = [&numExited](int exitCode) {
+            ++numExited;
+         };
+
+         // run program
+         Error error = supervisor.runCommand("echo hello && sleep 60", options, callbacks);
+         if (error)
+         {
+            numError++;
+            lastError = error;
+         }
+      }
+
+      if (lastError)
+         std::cout << lastError.getSummary() << " " << lastError.getLocation().asString() << std::endl;
+
+      CHECK(numError == 0);
+
+      // wait for processes to start
+      int numTries = 0;
+      while (numStarted < 10)
+      {
+         sleep(1);
+
+         // make sure we fail out if the processes don't all start
+         REQUIRE((++numTries != 10));
+      }
+
+      // kill the child processes
+      Error error = core::system::terminateChildProcesses();
+      REQUIRE(!error);
+
+      // wait for processes to exit
+      bool success = supervisor.wait(boost::posix_time::seconds(10));
+      CHECK(success);
+
+      // check to make sure all processes really exited
+      CHECK(numExited == 10);
+   }
+
+   test_that("Error code for signal is reported bash-style")
+   {
+      IoServiceFixture fixture;
+
+      // create new supervisor
+      AsioProcessSupervisor supervisor(fixture.ioService);
+
+      boost::mutex mutex;
+      boost::condition_variable cond;
+      bool started = false;
+      int exitCode = 0;
+
+      // create process options and callbacks
+      ProcessOptions options;
+      options.threadSafe = true;
+
+      ProcessCallbacks callbacks;
+
+      callbacks.onStdout = [&](ProcessOperations&, const std::string& out)
+      {
+         LOCK_MUTEX(mutex)
+         {
+            started = true;
+            cond.notify_all();
+         }
+         END_LOCK_MUTEX
+      };
+
+      callbacks.onExit = [&](int ec)
+      {
+         LOCK_MUTEX(mutex)
+         {
+            exitCode = ec;
+            cond.notify_all();
+         }
+         END_LOCK_MUTEX
+      };
+
+      // run program
+      Error error = supervisor.runCommand("echo hello && sleep 60", options, callbacks);
+      REQUIRE(!error);
+
+      // wait for process to start
+      boost::unique_lock<boost::mutex> lock(mutex);
+      if (!started)
+      {
+         bool timedOut = !cond.timed_wait(lock, boost::posix_time::seconds(5), [&]{return started;});
+         REQUIRE(!timedOut);
+         REQUIRE(started);
+      }
+      lock.unlock();
+
+      // kill the child processes
+      sleep(1);
+      error = core::system::terminateChildProcesses();
+      REQUIRE(!error);
+
+      // wait for processes to exit
+      bool success = supervisor.wait(boost::posix_time::seconds(10));
+      CHECK(success);
+
+      // check to make sure we got the exit code we expected
+      lock.lock();
+      if (exitCode == 0)
+      {
+         bool timedOut = !cond.timed_wait(lock, boost::posix_time::seconds(5), [&]{return exitCode != 0;});
+         REQUIRE(!timedOut);
+      }
+      lock.unlock();
+
+      REQUIRE(exitCode == 128 + SIGTERM);
+   }
+
+   test_that("Normal exit code is reported properly")
+   {
+      IoServiceFixture fixture;
+
+      // create new supervisor
+      AsioProcessSupervisor supervisor(fixture.ioService);
+
+      boost::mutex mutex;
+      boost::condition_variable cond;
+      bool started = false;
+      int exitCode = 0;
+
+      // create process options and callbacks
+      ProcessOptions options;
+      options.threadSafe = true;
+
+      ProcessCallbacks callbacks;
+
+      callbacks.onStdout = callbacks.onStderr = [&](ProcessOperations&, const std::string& out)
+      {
+         LOCK_MUTEX(mutex)
+         {
+            started = true;
+            cond.notify_all();
+         }
+         END_LOCK_MUTEX
+      };
+
+      callbacks.onExit = [&](int ec)
+      {
+         LOCK_MUTEX(mutex)
+         {
+            exitCode = ec;
+            cond.notify_all();
+         }
+         END_LOCK_MUTEX
+      };
+
+      // run program
+      Error error = supervisor.runCommand("cat --non-existent-option", options, callbacks);
+      REQUIRE(!error);
+
+      // wait for process to start
+      boost::unique_lock<boost::mutex> lock(mutex);
+      if (!started)
+      {
+         bool timedOut = !cond.timed_wait(lock, boost::posix_time::seconds(5), [&]{return started;});
+         REQUIRE(!timedOut);
+         REQUIRE(started);
+      }
+      lock.unlock();
+
+      // kill the child processes
+      error = core::system::terminateChildProcesses();
+      REQUIRE(!error);
+
+      // wait for processes to exit
+      bool success = supervisor.wait(boost::posix_time::seconds(10));
+      CHECK(success);
+
+      // check to make sure we got the exit code we expected
+      lock.lock();
+      if (exitCode == 0)
+      {
+         bool timedOut = !cond.timed_wait(lock, boost::posix_time::seconds(5), [&]{return exitCode != 0;});
+         REQUIRE(!timedOut);
+      }
+      lock.unlock();
+
+      REQUIRE(exitCode == 1);
    }
 }
 

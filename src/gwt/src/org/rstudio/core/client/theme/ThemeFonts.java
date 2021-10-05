@@ -1,7 +1,7 @@
 /*
  * ThemeFonts.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,13 +17,16 @@ package org.rstudio.core.client.theme;
 import com.google.gwt.core.client.GWT;
 
 import org.rstudio.core.client.BrowseCap;
+import org.rstudio.core.client.StringUtil;
+import org.rstudio.studio.client.RStudioGinjector;
+import org.rstudio.studio.client.workbench.prefs.model.UserPrefs;
 
 
 public class ThemeFonts
 {
    private static final ThemeFontLoader fontLoader =
          GWT.create(ThemeFontLoader.class);
-   
+
    public static String getProportionalFont()
    {
       return fontLoader.getProportionalFont() + ", serif";
@@ -40,21 +43,26 @@ public class ThemeFonts
       String getFixedWidthFont();
    }
 
+   public static String getFixedWidthClass()
+   {
+      return "rstudio-fixed-width-font";
+   }
+
    static class DesktopThemeFontLoader implements ThemeFontLoader
    {
       public final String getProportionalFont()
       {
          return getDesktopInfo("proportionalFont");
       }
-      
+
       public final String getFixedWidthFont()
       {
          return getDesktopInfo("fixedWidthFont");
       }
-      
+
       private static final native String getDesktopInfo(String property)
       /*-{
-         
+
          // NOTE: because this is called very early during the startup process
          // (GWT needs to generate CSS based on the value of these entries),
          // it's possible (for satellite windows) that the 'desktopInfo' object
@@ -66,9 +74,9 @@ public class ThemeFonts
                break;
             window = window.opener;
          }
-         
+
          return window.desktopInfo[property];
-         
+
       }-*/;
    }
 
@@ -77,17 +85,62 @@ public class ThemeFonts
       public String getProportionalFont()
       {
          String font = BrowseCap.hasUbuntuFonts() ? "Ubuntu, " : "";
-         return font + "\"Lucida Sans\", \"DejaVu Sans\", \"Lucida Grande\", \"Segoe UI\", Verdana, Helvetica, sans-serif"; 
+         return font + "\"Lucida Sans\", \"DejaVu Sans\", \"Lucida Grande\", \"Segoe UI\", Verdana, Helvetica, sans-serif";
       }
 
       public String getFixedWidthFont()
       {
+         // First choice is the font the user specified (not available until
+         // session info is loaded)
+         String font = "";
+         if (RStudioGinjector.INSTANCE.getSession().getSessionInfo() != null)
+         {
+            UserPrefs prefs = RStudioGinjector.INSTANCE.getUserPrefs();
+            if (prefs.serverEditorFontEnabled().getValue())
+            {
+               font = prefs.serverEditorFont().getValue();
+            }
+
+            if (StringUtil.isNullOrEmpty(font))
+            {
+               // No user preference registered
+               font = "";
+            }
+            else
+            {
+               // User preference registered; remaining fonts are fallbacks
+               font = "\"" + font + "\", ";
+            }
+         }
+
          if (BrowseCap.isMacintosh())
-            return "Monaco, monospace";
+            font += "Monaco, monospace";
          else if (BrowseCap.isLinux())
-            return "\"Ubuntu Mono\", \"Droid Sans Mono\", \"DejaVu Sans Mono\", monospace";
+            font += "\"Ubuntu Mono\", \"Droid Sans Mono\", \"DejaVu Sans Mono\", monospace";
          else
-            return "Consolas, \"Lucida Console\", monospace";
+            font += "Consolas, \"Lucida Console\", monospace";
+
+         return font;
       }
+   }
+
+   /**
+    * Empty implementation of theme font loader used for test mock
+    */
+   static class EmptyThemeFontLoader implements ThemeFontLoader
+   {
+
+      @Override
+      public String getProportionalFont()
+      {
+         return "";
+      }
+
+      @Override
+      public String getFixedWidthFont()
+      {
+         return "";
+      }
+
    }
 }

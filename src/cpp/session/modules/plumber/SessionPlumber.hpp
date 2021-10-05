@@ -1,7 +1,7 @@
 /*
  * SessionPlumber.hpp
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,17 +16,17 @@
 #ifndef SESSION_PLUMBER_HPP
 #define SESSION_PLUMBER_HPP
 
-#include <core/json/Json.hpp>
+#include <shared_core/json/Json.hpp>
 
 namespace rstudio {
 namespace core {
    class Error;
 }
 }
- 
+
 namespace rstudio {
 namespace session {
-namespace modules { 
+namespace modules {
 namespace plumber {
 
 enum class PlumberFileType
@@ -35,10 +35,8 @@ enum class PlumberFileType
    PlumberApi
 };
 
-PlumberFileType plumberTypeFromExtendedType(const std::string& extendedType);
-
 core::Error initialize();
-                       
+
 } // namespace plumber
 } // namespace modules
 } // namespace session

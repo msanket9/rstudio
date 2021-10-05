@@ -1,7 +1,7 @@
 /*
  * CRANMirror.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,9 +18,6 @@ import java.util.ArrayList;
 
 import org.rstudio.core.client.StringUtil;
 import org.rstudio.studio.client.workbench.prefs.model.UserPrefs;
-
-import com.google.gwt.core.client.JavaScriptObject;
-
 
 public class CRANMirror extends UserPrefs.CranMirror
 {
@@ -73,7 +70,7 @@ public class CRANMirror extends UserPrefs.CranMirror
    {
       setURL(cran);
 
-      ArrayList<String> entries = new ArrayList<String>();
+      ArrayList<String> entries = new ArrayList<>();
       for (CRANMirror repo : repos)
       {
          if (!repo.getName().toLowerCase().equals("cran"))
@@ -92,9 +89,16 @@ public class CRANMirror extends UserPrefs.CranMirror
 
    public final ArrayList<CRANMirror> getSecondaryRepos()
    {
-      ArrayList<CRANMirror> repos = new ArrayList<CRANMirror>();
+      ArrayList<CRANMirror> repos = new ArrayList<>();
 
-      String[] entries = getSecondary().split("\\|");
+      String secondary = getSecondary();
+      if (StringUtil.isNullOrEmpty(secondary))
+      {
+         // Return empty list of secondary repos if none were defined.
+         return repos;
+      }
+      
+      String[] entries = secondary.split("\\|");
       for (int i = 0; i < entries.length / 2; i++)
       {
          CRANMirror repo = CRANMirror.empty();

@@ -1,7 +1,7 @@
 /*
  * ChildProcessSubprocPollTests.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -15,10 +15,12 @@
 
 #include "ChildProcessSubprocPoll.hpp"
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/thread/thread.hpp>
 
 #include <tests/TestThat.hpp>
+
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace core {
@@ -223,7 +225,7 @@ test_context("ChildProcess polling support class")
       CwdPollingFixture test(pid);
 
       expect_true(test.poller_.hasRecentOutput());
-      expect_true(test.poller_.getCwd().empty());
+      expect_true(test.poller_.getCwd().isEmpty());
    }
 }
 

@@ -1,7 +1,7 @@
 /*
  * SessionHttpConnectionImpl.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -25,9 +25,9 @@
 #include <boost/asio/placeholders.hpp>
 #include <boost/enable_shared_from_this.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Log.hpp>
-#include <core/SafeConvert.hpp>
+#include <shared_core/SafeConvert.hpp>
 
 #include <core/http/Request.hpp>
 #include <core/http/Response.hpp>
@@ -285,8 +285,8 @@ private:
 
 private:
    typename ProtocolType::socket socket_;
-   boost::array<char, 8192> buffer_ ;
-   core::http::RequestParser requestParser_ ;
+   boost::array<char, 8192> buffer_;
+   core::http::RequestParser requestParser_;
    core::http::Request request_;
    std::string requestId_;
    HeadersParsedHandler headersParsedHandler_;

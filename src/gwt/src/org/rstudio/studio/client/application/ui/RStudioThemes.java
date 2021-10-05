@@ -1,7 +1,7 @@
 /*
  * RStudioThemes.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -40,19 +40,32 @@ public class RStudioThemes
       initializeThemes(themeName, document, element);
    }
 
+   public static void initializeThemes(Document document,
+                                       Element element)
+   {
+      if (activeTheme_ != null)
+      {
+         initializeThemes(activeTheme_, document, element);
+      }
+   }
+   
    public static void initializeThemes(String themeName,
                                        Document document,
                                        Element element)
    {
-      document.getBody().removeClassName("rstudio-themes-flat");
       element.removeClassName("rstudio-themes-dark");
       element.removeClassName("rstudio-themes-default");
       element.removeClassName("rstudio-themes-dark-grey");
       element.removeClassName("rstudio-themes-alternate");
       element.removeClassName("rstudio-themes-scrollbars");
 
+      document.getBody().removeClassName("rstudio-themes-flat");
+      
       document.getBody().removeClassName("rstudio-themes-dark-menus");
       document.getBody().removeClassName("rstudio-themes-dark-menus-disabled");
+      
+      document.getBody().removeClassName("rstudio-themes-light-menus");
+      document.getBody().removeClassName("rstudio-themes-light-menus-disabled");
       
       if (themeName == "default" || themeName == "dark-grey" || themeName == "alternate")
       {
@@ -63,6 +76,10 @@ public class RStudioThemes
             document.getBody().addClassName("rstudio-themes-dark-menus");
             element.addClassName("rstudio-themes-dark");
          }
+         else
+         {
+            document.getBody().addClassName("rstudio-themes-light-menus");
+         }
 
          if (usesScrollbars())
          {
@@ -72,6 +89,8 @@ public class RStudioThemes
          element.addClassName("rstudio-themes-" + themeName);
          element.setId("rstudio_container");
       }
+      
+      activeTheme_ = themeName;
    }
 
    public static boolean isFlat(UserPrefs prefs)
@@ -157,4 +176,5 @@ public class RStudioThemes
    }
    
    private static Boolean usesScrollbars_ = null;
+   private static String activeTheme_ = null;
 }

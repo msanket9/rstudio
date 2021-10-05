@@ -1,7 +1,7 @@
 /*
  * TcpIpAsyncClientSsl.hpp
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -23,11 +23,12 @@
 #include "BoostAsioSsl.hpp"
 
 #include <core/http/AsyncClient.hpp>
+#include <core/http/Ssl.hpp>
 #include <core/http/TcpIpAsyncConnector.hpp>
 
 namespace rstudio {
 namespace core {
-namespace http {  
+namespace http {
 
 class TcpIpAsyncClientSsl
    : public AsyncClient<boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >
@@ -39,7 +40,8 @@ public:
                        bool verify,
                        const std::string& certificateAuthority = std::string(),
                        const boost::posix_time::time_duration& connectionTimeout =
-                          boost::posix_time::time_duration(boost::posix_time::pos_infin))
+                          boost::posix_time::time_duration(boost::posix_time::pos_infin),
+                       const std::string& hostname = std::string() )
      : AsyncClient<boost::asio::ssl::stream<boost::asio::ip::tcp::socket> >(ioService),
        sslContext_(boost::asio::ssl::context::sslv23_client),
        address_(address),
@@ -48,28 +50,13 @@ public:
        certificateAuthority_(certificateAuthority),
        connectionTimeout_(connectionTimeout)
    {
-      if (verify_)
-      {
-         sslContext_.set_default_verify_paths();
-         sslContext_.set_verify_mode(boost::asio::ssl::context::verify_peer);
-
-         if (!certificateAuthority_.empty())
-         {
-            boost::asio::const_buffer buff(certificateAuthority_.data(), certificateAuthority_.size());
-            boost::system::error_code ec;
-            sslContext_.add_certificate_authority(buff, ec);
-            if (ec)
-               LOG_ERROR(Error(ec, ERROR_LOCATION));
-         }
-      }
-      else
-      {
-         sslContext_.set_verify_mode(boost::asio::ssl::context::verify_none);
-      }
+      ssl::initializeSslContext(&sslContext_, verify, certificateAuthority);
 
       // use scoped ptr so we can call the constructor after we've configured
       // the ssl::context (immediately above)
       ptrSslStream_.reset(new boost::asio::ssl::stream<boost::asio::ip::tcp::socket>(ioService, sslContext_));
+
+      ssl::initializeSslStream(ptrSslStream_.get(), (hostname.empty() ? address_.c_str() : hostname.c_str()));
    }
 
 
@@ -95,6 +82,11 @@ protected:
                         TcpIpAsyncClientSsl::sharedFromThis(),
                         _1),
             connectionTimeout_);
+   }
+
+   virtual std::string getDefaultHostHeader()
+   {
+      return address_ + ":" + port_;
    }
 
 
@@ -153,7 +145,7 @@ private:
    std::string certificateAuthority_;
    boost::posix_time::time_duration connectionTimeout_;
 };
-   
+
 
 } // namespace http
 } // namespace core

@@ -1,7 +1,7 @@
 /*
  * UserPrefsLayer.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,7 +17,7 @@
 #define SESSION_USER_PREF_LAYER_HPP
 
 #include <session/prefs/PrefLayer.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 
 namespace rstudio {
 namespace session {
@@ -29,7 +29,6 @@ public:
    UserPrefsLayer();
    core::Error readPrefs() override;
    core::Error writePrefs(const core::json::Object &prefs) override;
-   core::Error validatePrefs() override;
 
 protected:
    void onPrefsFileChanged() override;

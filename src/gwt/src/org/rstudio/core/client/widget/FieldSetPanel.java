@@ -1,7 +1,7 @@
 /*
  * FieldSetPanel.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -21,7 +21,6 @@ import com.google.gwt.user.client.ui.HasOneWidget;
 import com.google.gwt.user.client.ui.Label;
 import com.google.gwt.user.client.ui.SimplePanel;
 import org.rstudio.core.client.a11y.A11y;
-import org.rstudio.core.client.theme.res.ThemeStyles;
 
 /**
  * Base class for panels containing one widget, wrapped in a Fieldset element.
@@ -37,7 +36,7 @@ public class FieldSetPanel extends SimplePanel implements HasOneWidget
 
       if (visuallyHideLegend)
       {
-         legendElement_.setClassName(ThemeStyles.INSTANCE.visuallyHidden());
+         A11y.setVisuallyHidden(legendElement_);
       }
    }
    
@@ -71,9 +70,9 @@ public class FieldSetPanel extends SimplePanel implements HasOneWidget
    public void setLegendHidden(boolean hidden)
    {
       if (hidden)
-         legendElement_.setClassName(ThemeStyles.INSTANCE.visuallyHidden());
+         A11y.setVisuallyHidden(legendElement_);
       else
-         legendElement_.removeClassName(ThemeStyles.INSTANCE.visuallyHidden());
+         A11y.unsetVisuallyHidden(legendElement_);
    }
 
    private Element legendElement_;

@@ -1,7 +1,7 @@
 /*
  * RStudioAPI.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -15,7 +15,6 @@
 
 package org.rstudio.studio.client.common.rstudioapi;
 
-import com.google.gwt.user.client.Command;
 import org.rstudio.core.client.ElementIds;
 import org.rstudio.core.client.MessageDisplay;
 import org.rstudio.core.client.MessageDisplay.PromptWithOptionResult;
@@ -41,8 +40,6 @@ import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.VerticalPanel;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-
-import org.rstudio.studio.client.server.Void;
 
 @Singleton
 public class RStudioAPI implements RStudioAPIShowDialogEvent.Handler
@@ -94,14 +91,9 @@ public class RStudioAPI implements RStudioAPIShowDialogEvent.Handler
       
       if (!StringUtil.isNullOrEmpty(url))
       {
-         HyperlinkLabel link = new HyperlinkLabel(url, new Command() {
-            @Override
-            public void execute()
-            {
-               RStudioGinjector.INSTANCE.getGlobalDisplay()
-                  .openWindow(url);
-            }
-
+         HyperlinkLabel link = new HyperlinkLabel(url, () ->
+         {
+            RStudioGinjector.INSTANCE.getGlobalDisplay().openWindow(url);
          });
          link.addStyleName(RES.styles().installLink());
          verticalPanel.add(link);
@@ -116,7 +108,7 @@ public class RStudioAPI implements RStudioAPIShowDialogEvent.Handler
          @Override
          public void execute()
          {
-            server_.showDialogCompleted(null, false, new SimpleRequestCallback<Void>());
+            server_.showDialogCompleted(null, false, new SimpleRequestCallback<>());
          }
       }, true, false);
       dlg.showModal();
@@ -142,14 +134,14 @@ public class RStudioAPI implements RStudioAPIShowDialogEvent.Handler
             {
                indicator.onCompleted();
                
-               server_.showDialogCompleted(input.input, false, new SimpleRequestCallback<Void>());
+               server_.showDialogCompleted(input.input, false, new SimpleRequestCallback<>());
             }        
          }, 
          new Operation() {
             @Override
             public void execute()
             {
-               server_.showDialogCompleted(null, false, new SimpleRequestCallback<Void>());
+               server_.showDialogCompleted(null, false, new SimpleRequestCallback<>());
             }
          });
    }
@@ -169,17 +161,17 @@ public class RStudioAPI implements RStudioAPIShowDialogEvent.Handler
          false,
          new Operation() {
             public void execute() {
-               server_.showDialogCompleted(null, true, new SimpleRequestCallback<Void>());
+               server_.showDialogCompleted(null, true, new SimpleRequestCallback<>());
             }
          },
          new Operation() {
             public void execute() {
-               server_.showDialogCompleted(null, false, new SimpleRequestCallback<Void>());
+               server_.showDialogCompleted(null, false, new SimpleRequestCallback<>());
             }
          },
          new Operation() {
             public void execute() {
-               server_.showDialogCompleted(null, false, new SimpleRequestCallback<Void>());
+               server_.showDialogCompleted(null, false, new SimpleRequestCallback<>());
             }
          },
          ok,

@@ -1,7 +1,7 @@
 /*
  * ClearAllDialog.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -33,7 +33,6 @@ import org.rstudio.core.client.widget.ProgressOperationWithInput;
 import org.rstudio.core.client.widget.ThemedButton;
 import org.rstudio.core.client.widget.images.MessageDialogImages;
 import org.rstudio.studio.client.RStudioGinjector;
-import org.rstudio.studio.client.workbench.prefs.model.UserPrefs;
 import org.rstudio.studio.client.workbench.prefs.model.UserState;
 
 public class ClearAllDialog extends ModalDialogBase
@@ -129,7 +128,7 @@ public class ClearAllDialog extends ModalDialogBase
       return panel;
    }
    
-   private ProgressIndicator progress_ ;
+   private ProgressIndicator progress_;
    private CheckBox chkIncludeHidden_;
    private UserState state_;
    private int numObjects_;

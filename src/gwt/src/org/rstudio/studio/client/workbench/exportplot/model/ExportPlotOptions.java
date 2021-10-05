@@ -1,7 +1,7 @@
 /*
  * ExportPlotOptions.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -21,11 +21,6 @@ public class ExportPlotOptions extends UserStateAccessor.ExportPlotOptions
 {
    protected ExportPlotOptions() {}
    
-   public static final ExportPlotOptions createDefault()
-   {
-      return create(550, 450, false, "PNG", false, false);
-   }
-   
    public static final native ExportPlotOptions create(int width, 
                                                        int height,
                                                        boolean keepRatio,
@@ -34,13 +29,13 @@ public class ExportPlotOptions extends UserStateAccessor.ExportPlotOptions
                                                        boolean copyAsMetafile) 
    /*-{
       var options = new Object();
-      options.width = width ;
-      options.height = height ;
+      options.width = width;
+      options.height = height;
       options.format = format;
       options.keepRatio = keepRatio;
       options.viewAfterSave = viewAfterSave;
       options.copyAsMetafile = copyAsMetafile;
-      return options ;
+      return options;
    }-*/;
    
    public static final ExportPlotOptions adaptToSize(ExportPlotOptions options,

@@ -1,7 +1,7 @@
 /*
  * GwtFileHandler.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -29,6 +29,7 @@ http::UriHandlerFunction fileHandlerFunction(
       const std::string& initJs = std::string(),
       const std::string& gwtPrefix = std::string(),
       bool useEmulatedStack = false,
+      const std::string& serverHomepagePath = std::string(),
       const std::string& frameOptions = std::string());
    
 } // namespace gwt

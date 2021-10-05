@@ -1,7 +1,7 @@
 /*
  * AsyncConnection.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -41,7 +41,7 @@ typedef boost::function<void(boost::asio::io_service&,
                              Request*,
                              RequestFilterContinuation)> RequestFilter;
 
-typedef boost::function<void(const std::string&,Response*)> ResponseFilter;
+typedef boost::function<void(const Request& request, Response*)> ResponseFilter;
 
 // abstract base (insulate clients from knowledge of protocol-specifics)
 class AsyncConnection : public Socket
@@ -54,7 +54,6 @@ public:
 
    // request
    virtual const http::Request& request() const = 0;
-   virtual const std::string& originalUri() const = 0;
 
    // populate or set response then call writeResponse when done
    virtual http::Response& response() = 0;

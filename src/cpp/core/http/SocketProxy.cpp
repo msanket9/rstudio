@@ -1,7 +1,7 @@
 /*
  * SocketProxy.cpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -27,16 +27,16 @@
 
 #include <iostream>
 
-#include <boost/bind.hpp>
-
 #include <boost/asio/placeholders.hpp>
+#include <boost/bind/bind.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Log.hpp>
 
 #include <core/http/SocketUtils.hpp>
 
 using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace core {
@@ -150,8 +150,8 @@ void SocketProxy::handleError(const boost::system::error_code& e,
    // log the error if it wasn't connection terminated
    Error error(e, location);
    if (!http::isConnectionTerminatedError(error) &&
-       (error.code() != boost::asio::error::operation_aborted) &&
-       !util::isSslShutdownError(error.code()))
+       (e != boost::asio::error::operation_aborted) &&
+       !util::isSslShutdownError(e))
    {
       LOG_ERROR(error);
    }

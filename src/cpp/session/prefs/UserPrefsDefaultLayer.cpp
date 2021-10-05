@@ -1,7 +1,7 @@
 /*
  * UserPrefsDefaultLayer.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -34,13 +34,7 @@ UserPrefsDefaultLayer::UserPrefsDefaultLayer():
 core::Error UserPrefsDefaultLayer::readPrefs()
 {
    return loadPrefsFromSchema(
-      options().rResourcesPath().complete("schema").complete(kUserPrefsSchemaFile));
-}
-
-core::Error UserPrefsDefaultLayer::validatePrefs()
-{
-   // No need to validate defaults; they ship in the box and are validated at build time.
-   return Success();
+      options().rResourcesPath().completePath("schema").completePath(kUserPrefsSchemaFile));
 }
 
 } // namespace prefs

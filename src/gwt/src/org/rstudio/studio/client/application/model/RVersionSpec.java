@@ -1,7 +1,7 @@
 /*
  * RVersionSpec.java
  *
- * Copyright (C) 2009-13 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,7 +16,6 @@ package org.rstudio.studio.client.application.model;
 
 import org.rstudio.studio.client.workbench.prefs.model.UserPrefsAccessor.DefaultRVersion;
 
-import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.core.client.JsArray;
 
 public class RVersionSpec extends DefaultRVersion

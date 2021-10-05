@@ -1,7 +1,7 @@
 /*
  * MruList.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -13,12 +13,15 @@
  *
  */
 
+#ifndef CORE_MRU_LIST_HPP
+#define CORE_MRU_LIST_HPP
+
 #include <cstddef>
 
 #include <list>
 #include <string>
 
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 
 namespace rstudio {
 namespace core {
@@ -55,3 +58,4 @@ private:
 } // namespace core
 } // namespace rstudio
 
+#endif /* CORE_MRU_LIST_HPP */

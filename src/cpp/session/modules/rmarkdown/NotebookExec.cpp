@@ -1,7 +1,7 @@
 /*
  * NotebookExec.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -24,11 +24,12 @@
 #include "NotebookWorkingDir.hpp"
 #include "NotebookConditions.hpp"
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/text/CsvParser.hpp>
 #include <core/FileSerializer.hpp>
 
 #include <r/ROptions.hpp>
+#include <r/RUtil.hpp>
 
 #include <session/SessionModuleContext.hpp>
 
@@ -66,13 +67,13 @@ core::Error copyLibDirForOutput(const core::FilePath& file,
 {
    Error error = Success();
 
-   FilePath fileLib = file.parent().complete(kChunkLibDir);
+   FilePath fileLib = file.getParent().completePath(kChunkLibDir);
    if (fileLib.exists())
    {
       std::string docPath;
       source_database::getPath(docId, &docPath);
       error = mergeLib(fileLib, chunkCacheFolder(docPath, docId, nbCtxId)
-                                   .complete(kChunkLibDir));
+         .completePath(kChunkLibDir));
       if (error)
          LOG_ERROR(error);
 
@@ -84,22 +85,32 @@ core::Error copyLibDirForOutput(const core::FilePath& file,
    return error;
 }
 
-ChunkExecContext::ChunkExecContext(const std::string& docId, 
-      const std::string& chunkId, const std::string& nbCtxId, 
-      ExecScope execScope, const core::FilePath& workingDir, 
-      const ChunkOptions& options, int pixelWidth, int charWidth):
-   docId_(docId), 
-   chunkId_(chunkId),
-   nbCtxId_(nbCtxId),
-   workingDir_(workingDir),
-   options_(options),
-   pixelWidth_(pixelWidth),
-   charWidth_(charWidth),
-   prevCharWidth_(0),
-   lastOutputType_(kChunkConsoleInput),
-   execScope_(execScope),
-   hasOutput_(false),
-   hasErrors_(false)
+ChunkExecContext::ChunkExecContext(const std::string& docId,
+                                   const std::string& chunkId,
+                                   const std::string& chunkCode,
+                                   const std::string& chunkLabel,
+                                   const std::string& nbCtxId,
+                                   const std::string& engine,
+                                   ExecScope execScope,
+                                   const core::FilePath& workingDir,
+                                   const ChunkOptions& options,
+                                   int pixelWidth,
+                                   int charWidth)
+   : docId_(docId),
+     chunkId_(chunkId),
+     chunkCode_(chunkCode),
+     chunkLabel_(chunkLabel),
+     nbCtxId_(nbCtxId),
+     engine_(engine),
+     workingDir_(workingDir),
+     options_(options),
+     pixelWidth_(pixelWidth),
+     charWidth_(charWidth),
+     prevCharWidth_(0),
+     lastOutputType_(kChunkConsoleInput),
+     execScope_(execScope),
+     hasOutput_(false),
+     hasErrors_(false)
 {
 }
 
@@ -111,6 +122,11 @@ std::string ChunkExecContext::chunkId()
 std::string ChunkExecContext::docId()
 {
    return docId_;
+}
+
+std::string ChunkExecContext::engine()
+{
+   return engine_;
 }
 
 const ChunkOptions& ChunkExecContext::options() 
@@ -194,7 +210,7 @@ void ChunkExecContext::connect()
 
    error = pHtmlCapture->connectHtmlCapture(
             outputPath_,
-            outputPath_.parent().complete(kChunkLibDir),
+            outputPath_.getParent().completePath(kChunkLibDir),
             options_.chunkOptions());
    if (error)
       LOG_ERROR(error);
@@ -285,7 +301,6 @@ bool ChunkExecContext::onCondition(Condition condition,
          return true;
    }
 
-   // none of them did; treat it as ordinary output
    onConsoleOutput(module_context::ConsoleOutputError, message);
    module_context::enqueClientEvent(
       ClientEvent(client_events::kConsoleWriteError, message));
@@ -318,7 +333,7 @@ void ChunkExecContext::onFileOutput(const FilePath& file,
 
    // preserve original extension; some output types, such as plots, don't
    // have a canonical extension
-   target = target.parent().complete(target.stem() + file.extension());
+   target = target.getParent().completePath(target.getStem() + file.getExtension());
 
    Error error = file.move(target);
    if (error)
@@ -332,19 +347,17 @@ void ChunkExecContext::onFileOutput(const FilePath& file,
    copyLibDirForOutput(file, docId_, nbCtxId_);
 
    // if output sidecar file was provided, write it out
-   if (!sidecar.empty())
+   if (!sidecar.isEmpty())
    {
-      sidecar.move(target.parent().complete(
-               target.stem() + sidecar.extension()));
+      sidecar.move(target.getParent().completePath(
+               target.getStem() + sidecar.getExtension()));
    }
 
    // serialize metadata if provided
-   if (!metadata.is_null())
+   if (!metadata.isNull())
    {
-      std::ostringstream oss;
-      json::write(metadata, oss);
-      error = writeStringToFile(target.parent().complete(
-               target.stem() + ".metadata"), oss.str());
+      error = writeStringToFile(target.getParent().completePath(
+               target.getStem() + ".metadata"), metadata.write());
    }
 
    enqueueChunkOutput(docId_, chunkId_, nbCtxId_, ordinal, outputType, target,
@@ -363,14 +376,14 @@ void ChunkExecContext::onError(const core::json::Object& err)
    unsigned ordinal;
    FilePath target = getNextOutputFile(docId_, chunkId_, nbCtxId_, 
          ChunkOutputError, &ordinal);
-   boost::shared_ptr<std::ostream> pOfs;
-   Error error = target.open_w(&pOfs, true);
+   std::shared_ptr<std::ostream> pOfs;
+   Error error = target.openForWrite(pOfs, true);
    if (error)
    {
       LOG_ERROR(error);
       return;
    }
-   json::write(err, *pOfs);
+   err.write(*pOfs);
    
    pOfs->flush();
    pOfs.reset();
@@ -381,7 +394,7 @@ void ChunkExecContext::onError(const core::json::Object& err)
 }
 
 void ChunkExecContext::onConsoleText(int type, const std::string& output, 
-      bool truncate)
+      bool truncate, bool pending)
 {
    // if we haven't received any actual output yet, don't push input into the
    // file yet
@@ -404,12 +417,21 @@ void ChunkExecContext::onConsoleText(int type, const std::string& output,
    {
       std::string input = pendingInput_;
       pendingInput_.clear();
-      onConsoleText(kChunkConsoleInput, input, true);
+      if (pending)
+      {
+         // guard against any possibility of runaway recursion by discarding pending input if we are
+         // already processing it (no clear codepath leads to this but we've seen behavior that
+         // looks like it in the wild)
+         LOG_WARNING_MESSAGE("Discarding pending notebook text '" + input + "'");
+      }
+      else
+      {
+         onConsoleText(kChunkConsoleInput, input, true, true);
+      }
    }
 
    // determine output filename and ensure it exists
-   FilePath outputCsv = chunkOutputFile(docId_, chunkId_, nbCtxId_, 
-         ChunkOutputText);
+   FilePath outputCsv = chunkOutputFile(docId_, chunkId_, nbCtxId_, ChunkOutputText);
    Error error = outputCsv.ensureFile();
    if (error)
    {
@@ -417,12 +439,15 @@ void ChunkExecContext::onConsoleText(int type, const std::string& output,
       return;
    }
 
-   std::vector<std::string> vals; 
+   // write out as csv
+   std::vector<std::string> vals;
    vals.push_back(safe_convert::numberToString(type));
    vals.push_back(output);
-   error = core::writeStringToFile(outputCsv, 
-         text::encodeCsvLine(vals) + "\n", 
-         string_utils::LineEndingPassthrough, truncate);
+   error = core::writeStringToFile(
+            outputCsv,
+            text::encodeCsvLine(vals) + "\n",
+            string_utils::LineEndingPassthrough,
+            truncate);
    if (error)
    {
       LOG_ERROR(error);
@@ -470,21 +495,21 @@ void ChunkExecContext::disconnect()
 
    NotebookCapture::disconnect();
 
-   events().onChunkExecCompleted(docId_, chunkId_, nbCtxId_);
+   events().onChunkExecCompleted(docId_, chunkId_, chunkCode_, chunkLabel_, nbCtxId_);
 }
 
 void ChunkExecContext::onConsoleOutput(module_context::ConsoleOutputType type, 
       const std::string& output)
 {
    if (type == module_context::ConsoleOutputNormal)
-      onConsoleText(kChunkConsoleOutput, output, false);
+      onConsoleText(kChunkConsoleOutput, output, false, false);
    else
-      onConsoleText(kChunkConsoleError, output, false);
+      onConsoleText(kChunkConsoleError, output, false, false);
 }
 
 void ChunkExecContext::onConsoleInput(const std::string& input)
 {
-   onConsoleText(kChunkConsoleInput, input, false);
+   onConsoleText(kChunkConsoleInput, input, false, false);
 }
 
 void ChunkExecContext::initializeOutput()

@@ -1,7 +1,7 @@
 /*
  * RVersionSettings.hpp
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -99,7 +99,7 @@ public:
 
       // save R version in the project itself; used as a hint on preferred R version
       // when opening a project for the first time on a different machine/container
-      if (!sharedProjectScratchPath.empty())
+      if (!sharedProjectScratchPath.isEmpty())
       {
          writeSettingToPath(sharedProjectScratchPath, kRVersionProjectFile, version);
       }
@@ -125,7 +125,7 @@ public:
                                           kRVersionLabelSuffix);
 
       // if no local setting for R version, check for hint in .Rproj.user
-      if ((pVersion->empty() || pVersionHome->empty()) && !sharedProjectScratchPath.empty())
+      if ((pVersion->empty() || pVersionHome->empty()) && !sharedProjectScratchPath.isEmpty())
       {
          *pVersion = readSettingFromPath(sharedProjectScratchPath, kRVersionProjectFile);
          pVersionHome->clear();
@@ -153,7 +153,7 @@ private:
                      const core::FilePath& userScratchPath)
    {
       using namespace rstudio::core;
-      FilePath settingsPath = userScratchPath.complete(kRVersionSettings);
+      FilePath settingsPath = userScratchPath.completePath(kRVersionSettings);
       Error error = settingsPath.ensureDirectory();
       if (error)
          LOG_ERROR(error);

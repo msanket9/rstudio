@@ -1,7 +1,7 @@
 /*
  * SessionConsole.cpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -19,9 +19,9 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Exec.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 
 #include <core/system/OutputCapture.hpp>
 
@@ -35,6 +35,8 @@
 
 #include <session/prefs/UserPrefs.hpp>
 
+#define kMinConsoleLines 10
+
 using namespace rstudio::core;
 
 namespace rstudio {
@@ -46,6 +48,16 @@ namespace {
 
 bool suppressOutput(const std::string& output)
 {
+   if (options().getBoolOverlayOption(kLauncherSessionOption))
+   {
+      // in launcher session mode, we log normal program errors to stderr so they
+      // can be recorded in the launcher job's logs, but we don't want them to show
+      // up in the RStudio console, so we filter them out here
+      // note: all log messages will contain a tag like [rsession-username]
+      if (boost::algorithm::contains(output, "[rsession"))
+         return true;
+   }
+
    // tokens to suppress
    const char * const kGlibWarningToken = "GLib-WARNING **:";
    const char * const kGlibCriticalToken = "GLib-CRITICAL **:";
@@ -98,7 +110,7 @@ FilePath s_lastWorkingDirectory;
 void detectWorkingDirectoryChanged()
 {
    FilePath currentWorkingDirectory = module_context::safeCurrentPath();
-   if ( s_lastWorkingDirectory.empty() ||
+   if ( s_lastWorkingDirectory.isEmpty() ||
         (currentWorkingDirectory != s_lastWorkingDirectory) )
    {
       // fire event
@@ -198,6 +210,20 @@ Error initialize()
          return error;
    }
 
+   // set console action capacity from user pref, presuming the value is reasonable
+   int maxLines = prefs::userPrefs().consoleMaxLines();
+   if (maxLines < kMinConsoleLines)
+   {
+      LOG_WARNING_MESSAGE("Console must have at least " + 
+            safe_convert::numberToString(kMinConsoleLines) + 
+            " lines; ignoring invalid max line setting '" +
+            safe_convert::numberToString(maxLines) + "'");
+   }
+   else
+   {
+      r::session::consoleActions().setCapacity(maxLines);
+   }
+
    // register routines
    RS_REGISTER_CALL_METHOD(rs_getPendingInput);
    
@@ -212,7 +238,7 @@ Error initialize()
 
    // more initialization 
    using boost::bind;
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(sourceModuleRFile, "SessionConsole.R"))
       (bind(registerRpcMethod, "reset_console_actions", resetConsoleActions));

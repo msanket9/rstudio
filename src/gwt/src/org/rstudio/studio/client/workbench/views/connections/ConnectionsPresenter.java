@@ -1,7 +1,7 @@
 /*
  * ConnectionsPresenter.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * This program is licensed to you under the terms of version 3 of the
  * GNU Affero General Public License. This program is distributed WITHOUT
@@ -113,7 +113,8 @@ public class ConnectionsPresenter extends BasePresenter
                                ConnectionsServerOperations server,
                                GlobalDisplay globalDisplay,
                                EventBus eventBus,
-                               UserPrefs uiPrefs,
+                               UserPrefs userPrefs,
+                               UserState userState,
                                Binder binder,
                                final Commands commands,
                                WorkbenchListManager listManager,
@@ -125,7 +126,8 @@ public class ConnectionsPresenter extends BasePresenter
       display_ = display;
       commands_ = commands;
       server_ = server;
-      uiPrefs_ = uiPrefs;
+      state_ = userState;
+      userPrefs_ = userPrefs;
       globalDisplay_ = globalDisplay;
       eventBus_ = eventBus;
       applicationInterrupt_ = applicationInterrupt;
@@ -154,7 +156,7 @@ public class ConnectionsPresenter extends BasePresenter
          @Override
          public void onClick(ClickEvent event)
          {
-            showAllConnections(true);
+            showAllConnections(!userPrefs_.reducedMotion().getValue());
          }
       });
       
@@ -273,7 +275,7 @@ public class ConnectionsPresenter extends BasePresenter
    
    public void onNewConnection()
    {
-      // if r session bussy, fail
+      // if r session busy, fail
       if (commands_.interruptR().isEnabled()) {
          showError(
             "The R session is currently busy. Wait for completion or " +
@@ -436,7 +438,7 @@ public class ConnectionsPresenter extends BasePresenter
                  {
                      exploredConnection_ = removingConnection;
                      disconnectConnection(false);
-                     showAllConnections(true);
+                     showAllConnections(!userPrefs_.reducedMotion().getValue());
                  }
                  @Override
                  protected void onFailure()
@@ -598,12 +600,12 @@ public class ConnectionsPresenter extends BasePresenter
    
    private final GlobalDisplay globalDisplay_;
    
-   private final Display display_ ;
+   private final Display display_;
    private final EventBus eventBus_;
    private final Commands commands_;
-   private UserPrefs uiPrefs_;
    private UserState state_;
-   private final ConnectionsServerOperations server_ ;
+   private UserPrefs userPrefs_;
+   private final ConnectionsServerOperations server_;
    @SuppressWarnings("unused") private final ApplicationInterrupt applicationInterrupt_;
    
    // client state
@@ -612,8 +614,8 @@ public class ConnectionsPresenter extends BasePresenter
    private Connection exploredConnection_;
    private Connection lastExploredConnection_;
    
-   private ArrayList<Connection> allConnections_ = new ArrayList<Connection>();
-   private ArrayList<ConnectionId> activeConnections_ = new ArrayList<ConnectionId>();
+   private ArrayList<Connection> allConnections_ = new ArrayList<>();
+   private ArrayList<ConnectionId> activeConnections_ = new ArrayList<>();
    
    private static boolean installersUpdated_ = false;
    private static String installersWarning_ = null;

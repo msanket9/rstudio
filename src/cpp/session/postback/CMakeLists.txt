@@ -1,7 +1,7 @@
 #
 # CMakeLists.txt
 #
-# Copyright (C) 2009-19 by RStudio, Inc.
+# Copyright (C) 2021 by RStudio, PBC
 #
 # Unless you have received this program directly from RStudio pursuant
 # to the terms of a commercial license agreement with RStudio, then
@@ -31,18 +31,12 @@ include_directories(
 )
 
 # define executable
-add_executable(rpostback ${POSTBACK_SOURCE_FILES} ${POSTBACK_HEADER_FILES})
-
-# add origin rpath for suse/sles
-if(RSTUDIO_PACKAGE_BUILD_SLES)
-   set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-   set_target_properties(rpostback PROPERTIES
-                         INSTALL_RPATH \$ORIGIN)
-endif()
+add_stripped_executable(rpostback ${POSTBACK_SOURCE_FILES} ${POSTBACK_HEADER_FILES})
 
 # set link dependencies
 target_link_libraries(rpostback
    rstudio-core
+   ${CRASHPAD_LIBRARIES}
 )
 
 if (RSTUDIO_SERVER)
@@ -60,6 +54,11 @@ configure_file(rpostback-gitssh ${POSTBACK_SCRIPT_DIR}/rpostback-gitssh)
 configure_file(rpostback-askpass ${POSTBACK_SCRIPT_DIR}/rpostback-askpass)
 configure_file(askpass-passthrough ${POSTBACK_SCRIPT_DIR}/askpass-passthrough)
 
+# put rpostback in a place where it can be found for dev config
+if(NOT RSTUDIO_PACKAGE_BUILD)
+   set_target_properties(rpostback PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${POSTBACK_SCRIPT_DIR})
+endif()
+
 # installation rules
 if(NOT RSTUDIO_SESSION_WIN32)
    install(TARGETS rpostback DESTINATION ${RSTUDIO_INSTALL_BIN})
@@ -67,16 +66,5 @@ if(NOT RSTUDIO_SESSION_WIN32)
    set(POSTBACK_SCRIPTS ${POSTBACK_SCRIPTS} "askpass-passthrough")
    install(PROGRAMS ${POSTBACK_SCRIPTS}
            DESTINATION ${RSTUDIO_INSTALL_BIN}/postback)
-endif()
-
-# if doing a package build on MacOS, reroute the OpenSSL libraries to our bundled copies
-if(APPLE AND RSTUDIO_PACKAGE_BUILD)
-   find_package(OpenSSL REQUIRED QUIET)
-   foreach(lib ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})
-      get_filename_component(LIB_DIR ${lib} PATH)
-      execute_process(COMMAND readlink ${lib} OUTPUT_VARIABLE LIB_FILE OUTPUT_STRIP_TRAILING_WHITESPACE)
-      add_custom_command (TARGET rpostback POST_BUILD
-         COMMAND install_name_tool -change ${LIB_DIR}/${LIB_FILE} @executable_path/../Frameworks/${LIB_FILE} ${CMAKE_CURRENT_BINARY_DIR}/rpostback)
-   endforeach()
 endif()
 

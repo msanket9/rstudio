@@ -1,7 +1,7 @@
 /*
  * Preferences.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,7 +16,7 @@
 #ifndef SESSION_PREFERENCES_HPP
 #define SESSION_PREFERENCES_HPP
 
-#include <core/json/Json.hpp>
+#include <shared_core/json/Json.hpp>
 
 #include <boost/range/adaptor/reversed.hpp>
 
@@ -38,7 +38,9 @@ namespace prefs {
 class Preferences
 {
 public:
+   Preferences();
    core::Error initialize();
+   bool initialized();
    core::json::Array allLayers();
    core::json::Object userPrefLayer();
    core::json::Object getLayer(const std::string& name);
@@ -104,6 +106,7 @@ public:
    virtual core::Error createLayers() = 0;
    virtual int userLayer() = 0;
    virtual int clientChangedEvent() = 0;
+   void destroyLayers();
 
    // Signal emitted when preferences change; includes the layer name and value name
    RSTUDIO_BOOST_SIGNAL<void(const std::string&, const std::string&)> onChanged;
@@ -113,6 +116,7 @@ protected:
    core::Error readLayers();
    std::vector<boost::shared_ptr<PrefLayer>> layers_;
    boost::recursive_mutex mutex_;
+   bool initialized_;
 };
 
 } // namespace prefs

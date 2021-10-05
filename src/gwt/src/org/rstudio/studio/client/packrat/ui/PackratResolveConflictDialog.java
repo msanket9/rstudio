@@ -1,6 +1,6 @@
 /* PackratResolveConflictDialog.java
  *
- * Copyright (C) 2014-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -72,7 +72,7 @@ public class PackratResolveConflictDialog
       mainWidget_.add(label);
             
       // table
-      table_ = new RStudioDataGrid<PackratConflictActions>(conflictActions.size(),
+      table_ = new RStudioDataGrid<>(conflictActions.size(),
             (PackagesDataGridCommon)GWT.create(PackagesDataGridCommon.class));
       StyleUtils.forceMacScrollbars(table_);
       table_.addStyleName(RESOURCES.styles().conflictsTable());
@@ -210,7 +210,7 @@ public class PackratResolveConflictDialog
       Styles styles();
    }
    
-   static Resources RESOURCES = (Resources)GWT.create(Resources.class) ;
+   static Resources RESOURCES = (Resources)GWT.create(Resources.class);
    public static void ensureStylesInjected()
    {
       RESOURCES.styles().ensureInjected();

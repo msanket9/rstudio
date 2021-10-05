@@ -1,7 +1,7 @@
 /*
  * UserPrefsComputedLayer.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -22,8 +22,10 @@
 #include <session/SessionModuleContext.hpp>
 #include <session/RVersionSettings.hpp>
 
-#include <core/json/Json.hpp>
+#include <shared_core/json/Json.hpp>
 #include <core/CrashHandler.hpp>
+
+#include <r/session/RSession.hpp>
 
 #include "../modules/SessionVCS.hpp"
 #include "../modules/SessionSVN.hpp"
@@ -45,19 +47,19 @@ Error UserPrefsComputedLayer::readPrefs()
    json::Object layer;
 
    // VCS executable paths ---------------------------------------------------
-   layer[kGitExePath] = modules::git::detectedGitExePath().absolutePath();
-   layer[kSvnExePath] = modules::svn::detectedSvnExePath().absolutePath();
+   layer[kGitExePath] = modules::git::detectedGitExePath().getAbsolutePath();
+   layer[kSvnExePath] = modules::svn::detectedSvnExePath().getAbsolutePath();
 
    // System terminal path (Linux) -------------------------------------------
-   layer[kTerminalPath] = detectedTerminalPath().absolutePath();
+   layer[kTerminalPath] = detectedTerminalPath().getAbsolutePath();
 
    // Initial working directory ----------------------------------------------
    layer[kInitialWorkingDirectory] = session::options().defaultWorkingDir();
 
    // SSH key ----------------------------------------------------------------
    FilePath sshKeyDir = modules::source_control::defaultSshKeyDir();
-   FilePath rsaSshKeyPath = sshKeyDir.childPath("id_rsa");
-   layer[kRsaKeyPath] = rsaSshKeyPath.absolutePath();
+   FilePath rsaSshKeyPath = sshKeyDir.completeChildPath("id_rsa");
+   layer[kRsaKeyPath] = rsaSshKeyPath.getAbsolutePath();
    layer["have_rsa_key"] = rsaSshKeyPath.exists();
 
    // Crash reporting --------------------------------------------------------
@@ -74,20 +76,33 @@ Error UserPrefsComputedLayer::readPrefs()
    layer[kDefaultRVersion] = defaultRVersionJson;
 
    // Synctex viewer ----------------------------------------------------------
-
-   layer[kPdfPreviewer] =  session::options().programMode() == kSessionProgramModeDesktop ?
-      kPdfPreviewerDesktopSynctex : kPdfPreviewerRstudio;
+#ifdef __APPLE__
+# define kDefaultDesktopPdfPreviewer kPdfPreviewerRstudio
+#else
+# define kDefaultDesktopPdfPreviewer kPdfPreviewerDesktopSynctex
+#endif
+   
+   layer[kPdfPreviewer] = (session::options().programMode() == kSessionProgramModeDesktop)
+         ? kDefaultDesktopPdfPreviewer
+         : kPdfPreviewerRstudio;
 
    // Spelling ----------------------------------------------------------------
    layer["spelling"] =
          session::modules::spelling::spellingPrefsContextAsJson();
 
-   cache_ = boost::make_shared<core::json::Object>(layer);
-   return Success();
-}
+   // Other session defaults from rsession.conf -------------------------------
 
-core::Error UserPrefsComputedLayer::validatePrefs()
-{
+   int saveAction = session::options().saveActionDefault();
+   if (saveAction == r::session::kSaveActionSave)
+      layer[kSaveWorkspace] = kSaveWorkspaceAlways;
+   else if (saveAction == r::session::kSaveActionNoSave)
+      layer[kSaveWorkspace] = kSaveWorkspaceNever;
+   else if (saveAction == r::session::kSaveActionAsk)
+      layer[kSaveWorkspace] = kSaveWorkspaceAsk;
+
+   layer[kRunRprofileOnResume] = session::options().rProfileOnResumeDefault();
+   
+   cache_ = boost::make_shared<core::json::Object>(layer);
    return Success();
 }
 

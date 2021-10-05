@@ -1,7 +1,7 @@
 /*
  * SavePlotAsPdfOptions.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -39,12 +39,12 @@ public class SavePlotAsPdfOptions extends UserStateAccessor.SavePlotAsPdfOptions
                                                   boolean cairoPdf,
                                                   boolean viewAfterSave) /*-{
       var options = new Object();
-      options.width = width ;
-      options.height = height ;
+      options.width = width;
+      options.height = height;
       options.portrait = portrait;
       options.cairo_pdf = cairoPdf;
       options.viewAfterSave = viewAfterSave;
-      return options ;
+      return options;
    }-*/;
    
    public static final SavePlotAsPdfOptions adaptToSize(

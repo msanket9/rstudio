@@ -1,7 +1,7 @@
 /*
  * ServerSecureUriHandler.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -37,7 +37,7 @@ namespace auth {
 typedef boost::function<void(
                            const std::string& username,
                            const core::http::Request&,
-                           core::http::Response*)> SecureUriHandlerFunction ;
+                           core::http::Response*)> SecureUriHandlerFunction;
 
 typedef boost::function<void(
                      const std::string& username,
@@ -69,7 +69,8 @@ typedef boost::variant<SecureAsyncUriHandlerFunctionEx,
       
 core::http::UriHandlerFunction secureHttpHandler(
                                     SecureUriHandlerFunction handler,
-                                    bool authenticate = false);
+                                    bool authenticate = false,
+                                    bool requireUserListCookie = true);
 
 core::http::UriHandlerFunction secureJsonRpcHandler(
                                     SecureUriHandlerFunction handler);
@@ -83,12 +84,14 @@ core::http::UriHandlerFunction secureUploadHandler(
 core::http::AsyncUriHandlerFunction secureAsyncHttpHandler(
                                     SecureAsyncUriHandlerFunction handler,
                                     bool authenticate = false,
-                                    bool refreshAuthCookies = true);
+                                    bool refreshAuthCookies = true,
+                                    bool requireUserListCookie = true);
 
 core::http::AsyncUriHandlerFunction secureAsyncHttpHandler(
                                     SecureAsyncUriHandlerFunction handler,
                                     core::http::AsyncUriHandlerFunction unauthorizedResponseFunction,
-                                    bool refreshAuthCookies);
+                                    bool refreshAuthCookies,
+                                    bool requireUserListCookie);
 
 core::http::AsyncUriHandlerFunction secureAsyncJsonRpcHandler(
                                     SecureAsyncUriHandlerFunction handler);

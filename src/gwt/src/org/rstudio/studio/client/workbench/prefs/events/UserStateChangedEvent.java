@@ -1,7 +1,7 @@
 /*
  * UserStateChangedEvent.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,15 +18,13 @@ import org.rstudio.core.client.js.JavaScriptSerializable;
 import org.rstudio.core.client.js.JsObject;
 import org.rstudio.studio.client.application.events.CrossWindowEvent;
 import org.rstudio.studio.client.workbench.prefs.model.PrefLayer;
-import org.rstudio.studio.client.workbench.prefs.model.UserState;
 
-import com.google.gwt.core.client.JavaScriptObject;
 import com.google.gwt.event.shared.EventHandler;
 
 @JavaScriptSerializable
 public class UserStateChangedEvent extends CrossWindowEvent<UserStateChangedEvent.Handler>
 {
-   public static final Type<UserStateChangedEvent.Handler> TYPE = new Type<UserStateChangedEvent.Handler>();
+   public static final Type<UserStateChangedEvent.Handler> TYPE = new Type<>();
    
    public UserStateChangedEvent()
    {

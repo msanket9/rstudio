@@ -1,6 +1,6 @@
 /* UserPrefValues.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -27,7 +27,6 @@ namespace session {
 namespace prefs {
 
 #define kContextId "context_id"
-#define kAgreementHash "agreement_hash"
 #define kAutoCreatedProfile "auto_created_profile"
 #define kTheme "theme"
 #define kThemeName "name"
@@ -71,7 +70,6 @@ namespace prefs {
 #define kConnectViaConnectNewRScript "connect-new-r-script"
 #define kConnectViaConnectNewRNotebook "connect-new-r-notebook"
 #define kConnectViaConnectCopyToClipboard "connect-copy-to-clipboard"
-#define kCranMirrorChanged "cran_mirror_changed"
 #define kErrorHandlerType "error_handler_type"
 #define kErrorHandlerTypeMessage "message"
 #define kErrorHandlerTypeTraceback "traceback"
@@ -79,6 +77,20 @@ namespace prefs {
 #define kErrorHandlerTypeNotebook "notebook"
 #define kErrorHandlerTypeCustom "custom"
 #define kUsingMingwGcc49 "using_mingw_gcc49"
+#define kVisualModeConfirmed "visual_mode_confirmed"
+#define kBibliographyDefaultType "bibliography_default_type"
+#define kBibliographyDefaultTypeBib "bib"
+#define kBibliographyDefaultTypeYaml "yaml"
+#define kBibliographyDefaultTypeJson "json"
+#define kCitationDefaultInText "citation_default_in_text"
+#define kZoteroConnectionType "zotero_connection_type"
+#define kZoteroConnectionTypeAuto "auto"
+#define kZoteroConnectionTypeNone "none"
+#define kZoteroConnectionTypeLocal "local"
+#define kZoteroConnectionTypeWeb "web"
+#define kZoteroUseBetterBibtex "zotero_use_better_bibtex"
+#define kZoteroApiKey "zotero_api_key"
+#define kZoteroDataDir "zotero_data_dir"
 
 class UserStateValues: public Preferences
 {
@@ -89,12 +101,6 @@ public:
     */
    std::string contextId();
    core::Error setContextId(std::string val);
-
-   /**
-    * Hash of the agreement that the user has accepted.
-    */
-   std::string agreementHash();
-   core::Error setAgreementHash(std::string val);
 
    /**
     * Whether we have automatically created an .Rprofile for this user.
@@ -181,12 +187,6 @@ public:
    core::Error setConnectVia(std::string val);
 
    /**
-    * Whether the CRAN mirror has been changed from its default.
-    */
-   bool cranMirrorChanged();
-   core::Error setCranMirrorChanged(bool val);
-
-   /**
     * The kind of handler to invoke when errors occur.
     */
    std::string errorHandlerType();
@@ -197,6 +197,48 @@ public:
     */
    bool usingMingwGcc49();
    core::Error setUsingMingwGcc49(bool val);
+
+   /**
+    * Whether or not the use of Visual Mode has been confirmed.
+    */
+   bool visualModeConfirmed();
+   core::Error setVisualModeConfirmed(bool val);
+
+   /**
+    * The default type for new bibliographies.
+    */
+   std::string bibliographyDefaultType();
+   core::Error setBibliographyDefaultType(std::string val);
+
+   /**
+    * The default style for inserting citations.
+    */
+   bool citationDefaultInText();
+   core::Error setCitationDefaultInText(bool val);
+
+   /**
+    * Zotero connection type (local or web)
+    */
+   std::string zoteroConnectionType();
+   core::Error setZoteroConnectionType(std::string val);
+
+   /**
+    * Whether to use Better BibTeX when suggesting citation keys and writing citations to BibTeX bibliographies
+    */
+   bool zoteroUseBetterBibtex();
+   core::Error setZoteroUseBetterBibtex(bool val);
+
+   /**
+    * Key for making Zotero API calls
+    */
+   std::string zoteroApiKey();
+   core::Error setZoteroApiKey(std::string val);
+
+   /**
+    * Directory containing Zotero data files
+    */
+   std::string zoteroDataDir();
+   core::Error setZoteroDataDir(std::string val);
 
 };
 

@@ -1,7 +1,7 @@
 /*
  * SessionClientEvent.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,21 +17,21 @@
 
 #include <boost/lexical_cast.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Log.hpp>
-#include <core/FilePath.hpp>
-#include <core/SafeConvert.hpp>
+#include <shared_core/FilePath.hpp>
+#include <shared_core/SafeConvert.hpp>
 #include <core/FileSerializer.hpp>
 #include <core/system/System.hpp>
 
-using namespace rstudio::core ;
+using namespace rstudio::core;
 
 namespace rstudio {
 namespace session {
 
 namespace client_events {
    
-const int kBusy = 1;  
+const int kBusy = 1;
 const int kConsolePrompt = 2;
 const int kConsoleWriteOutput = 3;
 const int kConsoleWriteError = 4;
@@ -196,6 +196,17 @@ const int kRequestDocumentClose = 178;
 const int kRequestDocumentCloseCompleted = 179;
 const int kExecuteAppCommand = 180;
 const int kUserStateChanged = 181;
+const int kHighlightUi = 182;
+const int kReplaceResult = 183;
+const int kReplaceUpdated = 184;
+const int kTutorialCommand = 185;
+const int kTutorialLaunch = 186;
+const int kReticulateEvent = 187;
+const int kEnvironmentChanged = 188;
+const int kRStudioApiRequest = 189;
+const int kDocumentCloseAllNoSave = 190;
+const int kMemoryUsageChanged = 191;
+const int kCommandCallbacksChanged = 192;
 }
 
 void ClientEvent::init(int type, const json::Value& data)
@@ -209,16 +220,16 @@ void ClientEvent::asJsonObject(int id, json::Object* pObject) const
 {
    json::Object& object = *pObject;
    object["id"] = id;
-   object["type"] = typeName(); 
+   object["type"] = typeName();
    object["data"] = data();
 }
    
 std::string ClientEvent::typeName() const 
 {
-   switch(type_)
+   switch (type_)
    {
       case client_events::kBusy:
-         return "busy";  
+         return "busy";
       case client_events::kConsolePrompt:
          return "console_prompt";
       case client_events::kConsoleWriteOutput:
@@ -344,7 +355,7 @@ std::string ClientEvent::typeName() const
       case client_events::kShowPresentationPane:
          return "show_presentation_pane";
       case client_events::kEnvironmentRefresh:
-         return "environment_refresh";   
+         return "environment_refresh";
       case client_events::kContextDepthChanged:
          return "context_depth_changed";
       case client_events::kEnvironmentAssigned:
@@ -543,6 +554,28 @@ std::string ClientEvent::typeName() const
          return "execute_app_command";
       case client_events::kUserStateChanged:
          return "user_state_changed";
+      case client_events::kHighlightUi:
+         return "highlight_ui";
+      case client_events::kReplaceResult:
+         return "replace_result";
+      case client_events::kReplaceUpdated:
+         return "replace_updated";
+      case client_events::kTutorialCommand:
+         return "tutorial_command";
+      case client_events::kTutorialLaunch:
+         return "tutorial_launch";
+      case client_events::kReticulateEvent:
+         return "reticulate_event";
+      case client_events::kEnvironmentChanged:
+         return "environment_changed";
+      case client_events::kRStudioApiRequest:
+         return "rstudioapi_request";
+      case client_events::kDocumentCloseAllNoSave:
+         return "document_close_all_no_save";
+      case client_events::kMemoryUsageChanged:
+         return "memory_usage_changed";
+      case client_events::kCommandCallbacksChanged:
+         return "command_callbacks_changed";
       default:
          LOG_WARNING_MESSAGE("unexpected event type: " + 
                              safe_convert::numberToString(type_));
@@ -573,7 +606,7 @@ ClientEvent browseUrlEvent(const std::string& url, const std::string& window)
 ClientEvent showErrorMessageEvent(const std::string& title,
                                   const std::string& message)
 {
-   json::Object errorMessage ;
+   json::Object errorMessage;
    errorMessage["title"] = title;
    errorMessage["message"] = message;
    return ClientEvent(client_events::kShowErrorMessage, errorMessage);

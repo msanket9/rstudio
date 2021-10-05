@@ -1,7 +1,7 @@
 /*
  * SessionLists.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,9 +18,9 @@
 
 #include <map>
 
-#include <boost/bind.hpp>
 #include <boost/utility.hpp>
 #include <boost/circular_buffer.hpp>
+#include <boost/bind/bind.hpp>
 
 #include <core/Exec.hpp>
 #include <core/FileSerializer.hpp>
@@ -29,6 +29,7 @@
 #include <session/SessionModuleContext.hpp>
 
 using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace session {
@@ -43,9 +44,9 @@ using namespace collection;
 const char * const kFileMru = "file_mru";
 const char * const kProjectMru = kProjectMruList;
 const char * const kHelpHistory = "help_history_links";
-const char * const kUserDictioanry = "user_dictionary";
+const char * const kUserDictionary = "user_dictionary";
 const char * const kPlotPublishMru = "plot_publish_mru";
-const char * const kAddinsMru = "addins_mru";
+const char * const kCommandPaletteMru = "command_palette_mru";
 
 // path to lists dir
 FilePath s_listsPath;
@@ -67,7 +68,7 @@ std::size_t listSize(const char* const name)
 
 FilePath listPath(const std::string& name)
 {
-   return s_listsPath.complete(name);
+   return s_listsPath.completePath(name);
 }
 
 Error readList(const std::string& name,
@@ -105,12 +106,12 @@ void onListsFileChanged(const core::system::FileChangeEvent& fileChange)
       return;
 
    // ignore if it is the lists directory
-   if (fileChange.fileInfo().absolutePath() == s_listsPath.absolutePath())
+   if (fileChange.fileInfo().absolutePath() == s_listsPath.getAbsolutePath())
       return;
 
    // get the name of the list
    FilePath filePath(fileChange.fileInfo().absolutePath());
-   std::string name = filePath.filename();
+   std::string name = filePath.getFilename();
 
    // read it
    boost::shared_ptr<MruList> list;
@@ -191,10 +192,10 @@ Error listSetContents(const json::JsonRpcRequest& request,
          continue;
       }
 
-      list.push_back(val.get_str());
+      list.push_back(val.getString());
    }
 
-   return writeCollectionToFile<std::list<std::string>>(listPath(name), list, stringifyString);
+   return writeCollectionToFile<std::list<std::string> >(listPath(name), list, stringifyString);
 }
 
 Error listInsertItem(bool prepend,
@@ -297,8 +298,8 @@ Error initialize()
    s_lists[kProjectMru] = 15;
    s_lists[kHelpHistory] = 15;
    s_lists[kPlotPublishMru] = 15;
-   s_lists[kUserDictioanry] = 10000;
-   s_lists[kAddinsMru] = 15;
+   s_lists[kCommandPaletteMru] = 10;
+   s_lists[kUserDictionary] = 10000;
 
    // monitor the lists directory
    s_listsPath = module_context::registerMonitoredUserScratchDir(
@@ -307,7 +308,7 @@ Error initialize()
 
    using boost::bind;
    using namespace module_context;
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(registerRpcMethod, "list_get", listGet))
       (bind(registerRpcMethod, "list_set_contents", listSetContents))

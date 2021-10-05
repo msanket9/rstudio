@@ -1,7 +1,7 @@
 /*
  * UserPrefsSystemLayer.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -34,13 +34,9 @@ UserPrefsSystemLayer::UserPrefsSystemLayer():
 core::Error UserPrefsSystemLayer::readPrefs()
 {
    return loadPrefsFromFile(
-         core::system::xdg::systemConfigDir().complete(kUserPrefsFile));
-}
-
-core::Error UserPrefsSystemLayer::validatePrefs()
-{
-   return validatePrefsFromSchema(
-      options().rResourcesPath().complete("schema").complete(kUserPrefsSchemaFile));
+      core::system::xdg::systemConfigFile(kUserPrefsFile),
+      options().rResourcesPath().completePath("schema").completePath(kUserPrefsSchemaFile));
+      
 }
 
 } // namespace prefs

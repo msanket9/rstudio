@@ -1,7 +1,7 @@
 /*
  * RSConnectDeploy.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,13 +16,17 @@ package org.rstudio.studio.client.rsconnect.ui;
 
 import java.util.ArrayList;
 
+import com.google.gwt.aria.client.Id;
+import com.google.gwt.aria.client.Roles;
 import org.rstudio.core.client.CommandWithArg;
 import org.rstudio.core.client.Debug;
+import org.rstudio.core.client.ElementIds;
 import org.rstudio.core.client.JsArrayUtil;
 import org.rstudio.core.client.StringUtil;
 import org.rstudio.core.client.files.FileSystemItem;
 import org.rstudio.core.client.resources.ImageResource2x;
 import org.rstudio.core.client.widget.FormLabel;
+import org.rstudio.core.client.widget.HyperlinkLabel;
 import org.rstudio.core.client.widget.Operation;
 import org.rstudio.core.client.widget.OperationWithInput;
 import org.rstudio.core.client.widget.ProgressIndicator;
@@ -69,7 +73,6 @@ import com.google.gwt.user.client.Command;
 import com.google.gwt.user.client.Timer;
 import com.google.gwt.user.client.ui.Anchor;
 import com.google.gwt.user.client.ui.Composite;
-import com.google.gwt.user.client.ui.Grid;
 import com.google.gwt.user.client.ui.HTMLPanel;
 import com.google.gwt.user.client.ui.HorizontalPanel;
 import com.google.gwt.user.client.ui.Image;
@@ -175,7 +178,12 @@ public class RSConnectDeploy extends Composite
       initWidget(uiBinder.createAndBindUi(this));
       style_ = RESOURCES.style();
       nameLabel_.setFor(appName_.getTextBox());
-      
+      accountList_.setLabelledBy(accountListLabel_.getElement());
+      ElementIds.assignElementId(fileListLabel_, ElementIds.RSC_FILES_LIST_LABEL);
+      Roles.getListboxRole().set(fileListPanel_.getElement());
+      Roles.getListboxRole().setAriaLabelledbyProperty(fileListPanel_.getElement(),
+         Id.of(fileListLabel_.getElement()));
+
       if (asWizard)
       {
          deployIllustration_.setVisible(false);
@@ -189,29 +197,18 @@ public class RSConnectDeploy extends Composite
       // Invoke the "add account" wizard
       if (contentType == RSConnect.CONTENT_TYPE_APP || rsConnectEnabled)
       {
-         addAccountAnchor_.addClickHandler(new ClickHandler()
+         addAccountAnchor_.setClickHandler(() ->
          {
-            @Override
-            public void onClick(ClickEvent event)
-            {
-               connector_.showAccountWizard(false, 
-                     contentType == RSConnect.CONTENT_TYPE_APP ||
-                     contentType == RSConnect.CONTENT_TYPE_APP_SINGLE, 
-                     new OperationWithInput<Boolean>() 
-               {
-                  @Override
-                  public void execute(Boolean successful)
+            connector_.showAccountWizard(false,
+                  contentType == RSConnect.CONTENT_TYPE_APP ||
+                  contentType == RSConnect.CONTENT_TYPE_APP_SINGLE,
+                  successful ->
                   {
                      if (successful)
                      {
                         accountList_.refreshAccountList();
                      }
-                  }
-               });
-               
-               event.preventDefault();
-               event.stopPropagation();
-            }
+                  });
          });
       }
       else
@@ -221,18 +218,12 @@ public class RSConnectDeploy extends Composite
          addAccountAnchor_.setVisible(false);
       }
       
-      createNewAnchor_.addClickHandler(new ClickHandler()
+      createNewAnchor_.setClickHandler(() ->
       {
-         @Override
-         public void onClick(ClickEvent event)
-         {
-            event.preventDefault();
-            event.stopPropagation();
-            display_.showMessage(GlobalDisplay.MSG_INFO, 
-                  "Create New Content", 
-                  "To publish this content to a new location, click the Publish drop-down menu " +
-                  "and choose Other Destination.");
-         }
+         display_.showMessage(GlobalDisplay.MSG_INFO, 
+               "Create New Content", 
+               "To publish this content to a new location, click the Publish drop-down menu " +
+               "and choose Other Destination.");
       });
 
       checkUncheckAllButton_.getElement().getStyle().setMarginLeft(0, Unit.PX);
@@ -1297,10 +1288,9 @@ public class RSConnectDeploy extends Composite
       appErrorMessage_.setTitle(error);
    }
 
-   @UiField Anchor addAccountAnchor_;
-   @UiField Anchor createNewAnchor_;
+   @UiField HyperlinkLabel addAccountAnchor_;
+   @UiField HyperlinkLabel createNewAnchor_;
    @UiField Anchor urlAnchor_;
-   @UiField Grid mainGrid_;
    @UiField HTMLPanel appDetailsPanel_;
    @UiField HTMLPanel appInfoPanel_;
    @UiField HTMLPanel appProgressPanel_;
@@ -1310,6 +1300,7 @@ public class RSConnectDeploy extends Composite
    @UiField HTMLPanel accountEntryPanel_;
    @UiField Image deployIllustration_;
    @UiField Image descriptionImage_;
+   @UiField InlineLabel fileListLabel_;
    @UiField InlineLabel deployLabel_;
    @UiField Label appErrorMessage_;
    @UiField Label appExistingName_;
@@ -1324,6 +1315,7 @@ public class RSConnectDeploy extends Composite
    @UiField VerticalPanel descriptionPanel_;
    @UiField HorizontalPanel publishFromPanel_;
    @UiField RSConnectAccountEntry accountEntry_;
+   @UiField FormLabel accountListLabel_;
    
    // provided fields
    @UiField(provided=true) RSConnectAccountList accountList_;
@@ -1335,6 +1327,7 @@ public class RSConnectDeploy extends Composite
    private RSConnectServerOperations server_;
    private GlobalDisplay display_;
    private RSAccountConnector connector_;
+   @SuppressWarnings("unused")
    private UserPrefs userPrefs_;
    private UserState userState_;
    

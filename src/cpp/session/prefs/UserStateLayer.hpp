@@ -1,7 +1,7 @@
 /*
  * UserStateLayer.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -28,7 +28,8 @@ public:
    UserStateLayer();
    core::Error readPrefs();
    core::Error writePrefs(const core::json::Object &prefs);
-   core::Error validatePrefs();
+private:
+   core::FilePath stateFile_;
 };
 
 } // namespace prefs

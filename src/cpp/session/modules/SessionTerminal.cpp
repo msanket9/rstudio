@@ -1,7 +1,7 @@
 /*
  * SessionTerminal.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -80,9 +80,9 @@ Error getTerminalOptions(const json::JsonRpcRequest& request,
    std::string extraPathEntries;
    session::modules::workbench::ammendShellPaths(&extraPathEntries);
 
-   optionsJson["terminal_path"] = terminalPath.absolutePath();
+   optionsJson["terminal_path"] = terminalPath.getAbsolutePath();
    optionsJson["working_directory"] =
-                  module_context::shellWorkingDirectory().absolutePath();
+      module_context::shellWorkingDirectory().getAbsolutePath();
    optionsJson["extra_path_entries"] = extraPathEntries;
    optionsJson["shell_type"] = console_process::TerminalShell::getShellId(shellType);
    pResponse->setResult(optionsJson);
@@ -97,7 +97,7 @@ core::Error initialize()
 {
    using boost::bind;
    using namespace module_context;
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(registerRpcMethod, "get_terminal_options", getTerminalOptions));
    return initBlock.execute();

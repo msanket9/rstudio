@@ -1,7 +1,7 @@
 /*
  * SectionChooser.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -37,6 +37,9 @@ import com.google.gwt.user.client.ui.Widget;
 import org.rstudio.core.client.a11y.A11y;
 import org.rstudio.core.client.widget.DecorativeImage;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 /**
  * Vertical tab control used by Preferences dialogs. Follows the ARIA tab pattern.
  * 
@@ -56,14 +59,14 @@ import org.rstudio.core.client.widget.DecorativeImage;
 class SectionChooser extends SimplePanel implements
                                                 HasSelectionHandlers<Integer>
 {
-   private class ClickableVerticalPanel extends VerticalPanel
+   private static class ClickableVerticalPanel extends VerticalPanel
    {
-      public HandlerRegistration addClickHandler(ClickHandler handler)
+      HandlerRegistration addClickHandler(ClickHandler handler)
       {
          return addDomHandler(handler, ClickEvent.getType());
       }
 
-      public HandlerRegistration addKeyDownHandler(KeyDownHandler handler)
+      HandlerRegistration addKeyDownHandler(KeyDownHandler handler)
       {
          return addDomHandler(handler, KeyDownEvent.getType());
       }
@@ -105,7 +108,8 @@ class SectionChooser extends SimplePanel implements
       panel.getElement().setId(sectionTabId.getAriaValue());
 
       panel.addClickHandler(event -> select(inner_.getWidgetIndex(panel)));
-      panel.addKeyDownHandler(event -> {
+      panel.addKeyDownHandler(event ->
+      {
          switch(event.getNativeKeyCode())
          {
             case KeyCodes.KEY_UP:
@@ -128,6 +132,13 @@ class SectionChooser extends SimplePanel implements
       Roles.getTabRole().setAriaSelectedState(panel.getElement(), SelectedValue.FALSE);
       Roles.getTabRole().setAriaControlsProperty(panel.getElement(), getTabPanelId(sectionTabId));
       inner_.add(panel);
+
+      // FireFox fails to enumerate the tabs when building its accessibility tree, 
+      // perhaps due to the deep nesting of layout tables. Use the aria-owns attribute 
+      // to assist it. https://github.com/rstudio/rstudio/issues/5120
+      tabIds_.add(sectionTabId);
+      Roles.getTablistRole().setAriaOwnsProperty(getElement(), tabIds_.toArray(new Id[0]));
+
       return sectionTabId;
    }
 
@@ -274,6 +285,6 @@ class SectionChooser extends SimplePanel implements
 
    private Integer selectedIndex_;
    private final VerticalPanel inner_ = new VerticalPanel();
-   private static final PreferencesDialogBaseResources res_ = 
-                                    PreferencesDialogBaseResources.INSTANCE;
+   private static final PreferencesDialogBaseResources res_ = PreferencesDialogBaseResources.INSTANCE;
+   private final Set<Id> tabIds_ = new LinkedHashSet<>();
 }

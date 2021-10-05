@@ -1,6 +1,6 @@
 /* UserPrefValues.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -37,7 +37,7 @@ core::Error UserPrefValues::setRunRprofileOnResume(bool val)
 }
 
 /**
- * Whether to save the workspace after the R session ends.
+ * Whether to save the workspace to an .Rdata file after the R session ends.
  */
 std::string UserPrefValues::saveWorkspace()
 {
@@ -284,6 +284,19 @@ core::Error UserPrefValues::setPanes(core::json::Object val)
 }
 
 /**
+ * Whether to enable the ability to add source columns to display.
+ */
+bool UserPrefValues::allowSourceColumns()
+{
+   return readPref<bool>("allow_source_columns");
+}
+
+core::Error UserPrefValues::setAllowSourceColumns(bool val)
+{
+   return writePref("allow_source_columns", val);
+}
+
+/**
  * Whether to insert spaces when pressing the Tab key.
  */
 bool UserPrefValues::useSpacesForTab()
@@ -401,6 +414,19 @@ core::Error UserPrefValues::setContinueCommentsOnNewline(bool val)
 }
 
 /**
+ * Whether web links in comments are clickable.
+ */
+bool UserPrefValues::highlightWebLink()
+{
+   return readPref<bool>("highlight_web_link");
+}
+
+core::Error UserPrefValues::setHighlightWebLink(bool val)
+{
+   return writePref("highlight_web_link", val);
+}
+
+/**
  * The keybindings to use in the RStudio code editor.
  */
 std::string UserPrefValues::editorKeybindings()
@@ -463,6 +489,19 @@ bool UserPrefValues::tabMultilineCompletion()
 core::Error UserPrefValues::setTabMultilineCompletion(bool val)
 {
    return writePref("tab_multiline_completion", val);
+}
+
+/**
+ * Whether to attempt completion of statements when pressing Tab.
+ */
+bool UserPrefValues::tabCompletion()
+{
+   return readPref<bool>("tab_completion");
+}
+
+core::Error UserPrefValues::setTabCompletion(bool val)
+{
+   return writePref("tab_completion", val);
 }
 
 /**
@@ -739,7 +778,7 @@ core::Error UserPrefValues::setWarnVariableDefinedButNotUsed(bool val)
 }
 
 /**
- * Whether to automatically discover and offer to install missing R package dependenices.
+ * Whether to automatically discover and offer to install missing R package dependencies.
  */
 bool UserPrefValues::autoDiscoverPackageDependencies()
 {
@@ -778,7 +817,7 @@ core::Error UserPrefValues::setStripTrailingWhitespace(bool val)
 }
 
 /**
- * Whether to save the position of the cursor when a fille is closed, restore it when the file is opened.
+ * Whether to save the position of the cursor when a file is closed, restore it when the file is opened.
  */
 bool UserPrefValues::restoreSourceDocumentCursorPosition()
 {
@@ -827,6 +866,19 @@ bool UserPrefValues::softWrapRFiles()
 core::Error UserPrefValues::setSoftWrapRFiles(bool val)
 {
    return writePref("soft_wrap_r_files", val);
+}
+
+/**
+ * Whether to soft-wrap R Markdown files (and similar types such as R HTML and R Notebooks)
+ */
+bool UserPrefValues::softWrapRmdFiles()
+{
+   return readPref<bool>("soft_wrap_rmd_files");
+}
+
+core::Error UserPrefValues::setSoftWrapRmdFiles(bool val)
+{
+   return writePref("soft_wrap_rmd_files", val);
 }
 
 /**
@@ -882,6 +934,19 @@ core::Error UserPrefValues::setSyntaxColorConsole(bool val)
 }
 
 /**
+ * Whether to display error, warning, and message output in a different color.
+ */
+bool UserPrefValues::highlightConsoleErrors()
+{
+   return readPref<bool>("highlight_console_errors");
+}
+
+core::Error UserPrefValues::setHighlightConsoleErrors(bool val)
+{
+   return writePref("highlight_console_errors", val);
+}
+
+/**
  * Whether to allow scrolling past the end of a file.
  */
 bool UserPrefValues::scrollPastEndOfDocument()
@@ -908,6 +973,19 @@ core::Error UserPrefValues::setHighlightRFunctionCalls(bool val)
 }
 
 /**
+ * Whether to highlight parentheses in a variety of colors.
+ */
+bool UserPrefValues::rainbowParentheses()
+{
+   return readPref<bool>("rainbow_parentheses");
+}
+
+core::Error UserPrefValues::setRainbowParentheses(bool val)
+{
+   return writePref("rainbow_parentheses", val);
+}
+
+/**
  * The maximum number of characters to display in a single line in the R console.
  */
 int UserPrefValues::consoleLineLengthLimit()
@@ -921,6 +999,19 @@ core::Error UserPrefValues::setConsoleLineLengthLimit(int val)
 }
 
 /**
+ * The maximum number of console actions to store and display in the console scrollback buffer.
+ */
+int UserPrefValues::consoleMaxLines()
+{
+   return readPref<int>("console_max_lines");
+}
+
+core::Error UserPrefValues::setConsoleMaxLines(int val)
+{
+   return writePref("console_max_lines", val);
+}
+
+/**
  * How to treat ANSI escape codes in the console.
  */
 std::string UserPrefValues::ansiConsoleMode()
@@ -931,6 +1022,19 @@ std::string UserPrefValues::ansiConsoleMode()
 core::Error UserPrefValues::setAnsiConsoleMode(std::string val)
 {
    return writePref("ansi_console_mode", val);
+}
+
+/**
+ * Whether to only show a limited window of the total console output
+ */
+bool UserPrefValues::limitVisibleConsole()
+{
+   return readPref<bool>("limit_visible_console");
+}
+
+core::Error UserPrefValues::setLimitVisibleConsole(bool val)
+{
+   return writePref("limit_visible_console", val);
 }
 
 /**
@@ -986,6 +1090,19 @@ core::Error UserPrefValues::setFontSizePoints(double val)
 }
 
 /**
+ * The help panel font size, in points.
+ */
+double UserPrefValues::helpFontSizePoints()
+{
+   return readPref<double>("help_font_size_points");
+}
+
+core::Error UserPrefValues::setHelpFontSizePoints(double val)
+{
+   return writePref("help_font_size_points", val);
+}
+
+/**
  * The name of the color theme to apply to the text editor in RStudio.
  */
 std::string UserPrefValues::editorTheme()
@@ -996,6 +1113,32 @@ std::string UserPrefValues::editorTheme()
 core::Error UserPrefValues::setEditorTheme(std::string val)
 {
    return writePref("editor_theme", val);
+}
+
+/**
+ * Whether to use a custom editor font in RStudio Server.
+ */
+bool UserPrefValues::serverEditorFontEnabled()
+{
+   return readPref<bool>("server_editor_font_enabled");
+}
+
+core::Error UserPrefValues::setServerEditorFontEnabled(bool val)
+{
+   return writePref("server_editor_font_enabled", val);
+}
+
+/**
+ * The name of the fixed-width editor font to use with RStudio Server.
+ */
+std::string UserPrefValues::serverEditorFont()
+{
+   return readPref<std::string>("server_editor_font");
+}
+
+core::Error UserPrefValues::setServerEditorFont(std::string val)
+{
+   return writePref("server_editor_font", val);
 }
 
 /**
@@ -1220,32 +1363,6 @@ core::Error UserPrefValues::setIgnoreWordsWithNumbers(bool val)
 }
 
 /**
- * The maximum number of spelling words to check at once.
- */
-int UserPrefValues::maxSpellcheckWords()
-{
-   return readPref<int>("max_spellcheck_words");
-}
-
-core::Error UserPrefValues::setMaxSpellcheckWords(int val)
-{
-   return writePref("max_spellcheck_words", val);
-}
-
-/**
- * The maximum number of spelling correction suggestions to prefetch.
- */
-int UserPrefValues::maxSpellcheckPrefetch()
-{
-   return readPref<int>("max_spellcheck_prefetch");
-}
-
-core::Error UserPrefValues::setMaxSpellcheckPrefetch(int val)
-{
-   return writePref("max_spellcheck_prefetch", val);
-}
-
-/**
  * Whether to enable real-time spellchecking by default.
  */
 bool UserPrefValues::realTimeSpellchecking()
@@ -1373,6 +1490,19 @@ std::string UserPrefValues::shinyViewerType()
 core::Error UserPrefValues::setShinyViewerType(std::string val)
 {
    return writePref("shiny_viewer_type", val);
+}
+
+/**
+ * Whether to run Shiny applications as background jobs.
+ */
+bool UserPrefValues::shinyBackgroundJobs()
+{
+   return readPref<bool>("shiny_background_jobs");
+}
+
+core::Error UserPrefValues::setShinyBackgroundJobs(bool val)
+{
+   return writePref("shiny_background_jobs", val);
 }
 
 /**
@@ -1584,16 +1714,16 @@ core::Error UserPrefValues::setTerminalWebsockets(bool val)
 }
 
 /**
- * Whether to automatically close the Terminal tab.
+ * Whether to close the terminal pane after the shell exits.
  */
-bool UserPrefValues::terminalAutoClose()
+std::string UserPrefValues::terminalCloseBehavior()
 {
-   return readPref<bool>("terminal_auto_close");
+   return readPref<std::string>("terminal_close_behavior");
 }
 
-core::Error UserPrefValues::setTerminalAutoClose(bool val)
+core::Error UserPrefValues::setTerminalCloseBehavior(std::string val)
 {
-   return writePref("terminal_auto_close", val);
+   return writePref("terminal_close_behavior", val);
 }
 
 /**
@@ -1607,6 +1737,45 @@ bool UserPrefValues::terminalTrackEnvironment()
 core::Error UserPrefValues::setTerminalTrackEnvironment(bool val)
 {
    return writePref("terminal_track_environment", val);
+}
+
+/**
+ * Terminal bell style
+ */
+std::string UserPrefValues::terminalBellStyle()
+{
+   return readPref<std::string>("terminal_bell_style");
+}
+
+core::Error UserPrefValues::setTerminalBellStyle(std::string val)
+{
+   return writePref("terminal_bell_style", val);
+}
+
+/**
+ * Terminal rendering engine: canvas is faster, dom may be needed for some browsers or graphics cards
+ */
+std::string UserPrefValues::terminalRenderer()
+{
+   return readPref<std::string>("terminal_renderer");
+}
+
+core::Error UserPrefValues::setTerminalRenderer(std::string val)
+{
+   return writePref("terminal_renderer", val);
+}
+
+/**
+ * Whether web links displayed in the Terminal tab are made clickable.
+ */
+bool UserPrefValues::terminalWeblinks()
+{
+   return readPref<bool>("terminal_weblinks");
+}
+
+core::Error UserPrefValues::setTerminalWeblinks(bool val)
+{
+   return writePref("terminal_weblinks", val);
 }
 
 /**
@@ -1649,6 +1818,45 @@ core::Error UserPrefValues::setShowHiddenFiles(bool val)
 }
 
 /**
+ * List of file names (case sensitive) that are always shown in the Files Pane, regardless of whether hidden files are shown
+ */
+core::json::Array UserPrefValues::alwaysShownFiles()
+{
+   return readPref<core::json::Array>("always_shown_files");
+}
+
+core::Error UserPrefValues::setAlwaysShownFiles(core::json::Array val)
+{
+   return writePref("always_shown_files", val);
+}
+
+/**
+ * List of file extensions (beginning with ., not case sensitive) that are always shown in the Files Pane, regardless of whether hidden files are shown
+ */
+core::json::Array UserPrefValues::alwaysShownExtensions()
+{
+   return readPref<core::json::Array>("always_shown_extensions");
+}
+
+core::Error UserPrefValues::setAlwaysShownExtensions(core::json::Array val)
+{
+   return writePref("always_shown_extensions", val);
+}
+
+/**
+ * Whether to sort file names naturally, so that e.g., file10.R comes after file9.R
+ */
+bool UserPrefValues::sortFileNamesNaturally()
+{
+   return readPref<bool>("sort_file_names_naturally");
+}
+
+core::Error UserPrefValues::setSortFileNamesNaturally(bool val)
+{
+   return writePref("sort_file_names_naturally", val);
+}
+
+/**
  * The visibility of the Jobs tab.
  */
 std::string UserPrefValues::jobsTabVisibility()
@@ -1662,7 +1870,7 @@ core::Error UserPrefValues::setJobsTabVisibility(std::string val)
 }
 
 /**
- * Whether to show the Launcher jobs tab in RStudio Pro.
+ * Whether to show the Launcher jobs tab in RStudio Pro and RStudio Workbench.
  */
 bool UserPrefValues::showLauncherJobsTab()
 {
@@ -1675,7 +1883,7 @@ core::Error UserPrefValues::setShowLauncherJobsTab(bool val)
 }
 
 /**
- * How to sort jobs in the Launcher tab in RStudio Pro.
+ * How to sort jobs in the Launcher tab in RStudio Pro and RStudio Workbench.
  */
 std::string UserPrefValues::launcherJobsSort()
 {
@@ -1831,7 +2039,7 @@ core::Error UserPrefValues::setRootDocument(std::string val)
 }
 
 /**
- * When to show the server home page in RStudio Server Pro.
+ * When to show the server home page in RStudio Workbench.
  */
 std::string UserPrefValues::showUserHomePage()
 {
@@ -1844,7 +2052,7 @@ core::Error UserPrefValues::setShowUserHomePage(std::string val)
 }
 
 /**
- * Whether to reuse sessions when opening projects in RStudio Server Pro.
+ * Whether to reuse sessions when opening projects in RStudio Workbench.
  */
 bool UserPrefValues::reuseSessionsForProjectLinks()
 {
@@ -1867,6 +2075,19 @@ bool UserPrefValues::vcsEnabled()
 core::Error UserPrefValues::setVcsEnabled(bool val)
 {
    return writePref("vcs_enabled", val);
+}
+
+/**
+ * Automatically refresh VCS status?
+ */
+bool UserPrefValues::vcsAutorefresh()
+{
+   return readPref<bool>("vcs_autorefresh");
+}
+
+core::Error UserPrefValues::setVcsAutorefresh(bool val)
+{
+   return writePref("vcs_autorefresh", val);
 }
 
 /**
@@ -2013,6 +2234,32 @@ core::Error UserPrefValues::setRestoreLastProject(bool val)
 }
 
 /**
+ * The number of seconds after which a project is deemed to have successfully started.
+ */
+int UserPrefValues::projectSafeStartupSeconds()
+{
+   return readPref<int>("project_safe_startup_seconds");
+}
+
+core::Error UserPrefValues::setProjectSafeStartupSeconds(int val)
+{
+   return writePref("project_safe_startup_seconds", val);
+}
+
+/**
+ * Use tinytex to compile .tex files.
+ */
+bool UserPrefValues::useTinytex()
+{
+   return readPref<bool>("use_tinytex");
+}
+
+core::Error UserPrefValues::setUseTinytex(bool val)
+{
+   return writePref("use_tinytex", val);
+}
+
+/**
  * Whether to clean output after running Texi2Dvi.
  */
 bool UserPrefValues::cleanTexi2dviOutput()
@@ -2039,7 +2286,7 @@ core::Error UserPrefValues::setLatexShellEscape(bool val)
 }
 
 /**
- * Whether to restore the last version of R used by the project in RStudio Pro.
+ * Whether to restore the last version of R used by the project in RStudio Pro and RStudio Workbench.
  */
 bool UserPrefValues::restoreProjectRVersion()
 {
@@ -2090,6 +2337,552 @@ core::Error UserPrefValues::setDefaultRVersion(core::json::Object val)
    return writePref("default_r_version", val);
 }
 
+/**
+ * The maximum number of columns to show at once in the data viewer.
+ */
+int UserPrefValues::dataViewerMaxColumns()
+{
+   return readPref<int>("data_viewer_max_columns");
+}
+
+core::Error UserPrefValues::setDataViewerMaxColumns(int val)
+{
+   return writePref("data_viewer_max_columns", val);
+}
+
+/**
+ * Support accessibility aids such as screen readers (RStudio Server).
+ */
+bool UserPrefValues::enableScreenReader()
+{
+   return readPref<bool>("enable_screen_reader");
+}
+
+core::Error UserPrefValues::setEnableScreenReader(bool val)
+{
+   return writePref("enable_screen_reader", val);
+}
+
+/**
+ * Number of milliseconds to wait after last keystroke before updating live region.
+ */
+int UserPrefValues::typingStatusDelayMs()
+{
+   return readPref<int>("typing_status_delay_ms");
+}
+
+core::Error UserPrefValues::setTypingStatusDelayMs(int val)
+{
+   return writePref("typing_status_delay_ms", val);
+}
+
+/**
+ * Reduce use of animations in the user interface.
+ */
+bool UserPrefValues::reducedMotion()
+{
+   return readPref<bool>("reduced_motion");
+}
+
+core::Error UserPrefValues::setReducedMotion(bool val)
+{
+   return writePref("reduced_motion", val);
+}
+
+/**
+ * Tab key moves focus out of text editing controls instead of inserting tabs.
+ */
+bool UserPrefValues::tabKeyMoveFocus()
+{
+   return readPref<bool>("tab_key_move_focus");
+}
+
+core::Error UserPrefValues::setTabKeyMoveFocus(bool val)
+{
+   return writePref("tab_key_move_focus", val);
+}
+
+/**
+ * In source editor find panel, tab key moves focus directly from find text to replace text.
+ */
+bool UserPrefValues::findPanelLegacyTabSequence()
+{
+   return readPref<bool>("find_panel_legacy_tab_sequence");
+}
+
+core::Error UserPrefValues::setFindPanelLegacyTabSequence(bool val)
+{
+   return writePref("find_panel_legacy_tab_sequence", val);
+}
+
+/**
+ * Control with keyboard focus displays a visual focus indicator.
+ */
+bool UserPrefValues::showFocusRectangles()
+{
+   return readPref<bool>("show_focus_rectangles");
+}
+
+core::Error UserPrefValues::setShowFocusRectangles(bool val)
+{
+   return writePref("show_focus_rectangles", val);
+}
+
+/**
+ * Show which panel contains keyboard focus.
+ */
+bool UserPrefValues::showPanelFocusRectangle()
+{
+   return readPref<bool>("show_panel_focus_rectangle");
+}
+
+core::Error UserPrefValues::setShowPanelFocusRectangle(bool val)
+{
+   return writePref("show_panel_focus_rectangle", val);
+}
+
+/**
+ * How to deal with changes to documents on idle.
+ */
+std::string UserPrefValues::autoSaveOnIdle()
+{
+   return readPref<std::string>("auto_save_on_idle");
+}
+
+core::Error UserPrefValues::setAutoSaveOnIdle(std::string val)
+{
+   return writePref("auto_save_on_idle", val);
+}
+
+/**
+ * The idle period, in milliseconds, after which documents should be auto-saved.
+ */
+int UserPrefValues::autoSaveIdleMs()
+{
+   return readPref<int>("auto_save_idle_ms");
+}
+
+core::Error UserPrefValues::setAutoSaveIdleMs(int val)
+{
+   return writePref("auto_save_idle_ms", val);
+}
+
+/**
+ * Whether to automatically save when the editor loses focus.
+ */
+bool UserPrefValues::autoSaveOnBlur()
+{
+   return readPref<bool>("auto_save_on_blur");
+}
+
+core::Error UserPrefValues::setAutoSaveOnBlur(bool val)
+{
+   return writePref("auto_save_on_blur", val);
+}
+
+/**
+ * Initial directory for new terminals.
+ */
+std::string UserPrefValues::terminalInitialDirectory()
+{
+   return readPref<std::string>("terminal_initial_directory");
+}
+
+core::Error UserPrefValues::setTerminalInitialDirectory(std::string val)
+{
+   return writePref("terminal_initial_directory", val);
+}
+
+/**
+ * Whether to show the full path to project in desktop window title.
+ */
+bool UserPrefValues::fullProjectPathInWindowTitle()
+{
+   return readPref<bool>("full_project_path_in_window_title");
+}
+
+core::Error UserPrefValues::setFullProjectPathInWindowTitle(bool val)
+{
+   return writePref("full_project_path_in_window_title", val);
+}
+
+/**
+ * Whether to enable visual editing by default for new markdown documents
+ */
+bool UserPrefValues::visualMarkdownEditingIsDefault()
+{
+   return readPref<bool>("visual_markdown_editing_is_default");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingIsDefault(bool val)
+{
+   return writePref("visual_markdown_editing_is_default", val);
+}
+
+/**
+ * Default spacing for lists created in the visual editor
+ */
+std::string UserPrefValues::visualMarkdownEditingListSpacing()
+{
+   return readPref<std::string>("visual_markdown_editing_list_spacing");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingListSpacing(std::string val)
+{
+   return writePref("visual_markdown_editing_list_spacing", val);
+}
+
+/**
+ * Whether to automatically wrap text when writing markdown
+ */
+std::string UserPrefValues::visualMarkdownEditingWrap()
+{
+   return readPref<std::string>("visual_markdown_editing_wrap");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingWrap(std::string val)
+{
+   return writePref("visual_markdown_editing_wrap", val);
+}
+
+/**
+ * The column to wrap text at when writing markdown
+ */
+int UserPrefValues::visualMarkdownEditingWrapAtColumn()
+{
+   return readPref<int>("visual_markdown_editing_wrap_at_column");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingWrapAtColumn(int val)
+{
+   return writePref("visual_markdown_editing_wrap_at_column", val);
+}
+
+/**
+ * Placement of footnotes within markdown output.
+ */
+std::string UserPrefValues::visualMarkdownEditingReferencesLocation()
+{
+   return readPref<std::string>("visual_markdown_editing_references_location");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingReferencesLocation(std::string val)
+{
+   return writePref("visual_markdown_editing_references_location", val);
+}
+
+/**
+ * Whether to write canonical visual mode markdown when saving from source mode.
+ */
+bool UserPrefValues::visualMarkdownEditingCanonical()
+{
+   return readPref<bool>("visual_markdown_editing_canonical");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingCanonical(bool val)
+{
+   return writePref("visual_markdown_editing_canonical", val);
+}
+
+/**
+ * Maximum content width for visual editing mode, in pixels
+ */
+int UserPrefValues::visualMarkdownEditingMaxContentWidth()
+{
+   return readPref<int>("visual_markdown_editing_max_content_width");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingMaxContentWidth(int val)
+{
+   return writePref("visual_markdown_editing_max_content_width", val);
+}
+
+/**
+ * Whether to show the document outline by default when opening R Markdown documents in visual mode.
+ */
+bool UserPrefValues::visualMarkdownEditingShowDocOutline()
+{
+   return readPref<bool>("visual_markdown_editing_show_doc_outline");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingShowDocOutline(bool val)
+{
+   return writePref("visual_markdown_editing_show_doc_outline", val);
+}
+
+/**
+ * Whether to show the margin guide in the visual mode code blocks.
+ */
+bool UserPrefValues::visualMarkdownEditingShowMargin()
+{
+   return readPref<bool>("visual_markdown_editing_show_margin");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingShowMargin(bool val)
+{
+   return writePref("visual_markdown_editing_show_margin", val);
+}
+
+/**
+ * The default visual editing mode font size, in points
+ */
+int UserPrefValues::visualMarkdownEditingFontSizePoints()
+{
+   return readPref<int>("visual_markdown_editing_font_size_points");
+}
+
+core::Error UserPrefValues::setVisualMarkdownEditingFontSizePoints(int val)
+{
+   return writePref("visual_markdown_editing_font_size_points", val);
+}
+
+/**
+ * The name of the editor to use to provide code editing in visual mode
+ */
+std::string UserPrefValues::visualMarkdownCodeEditor()
+{
+   return readPref<std::string>("visual_markdown_code_editor");
+}
+
+core::Error UserPrefValues::setVisualMarkdownCodeEditor(std::string val)
+{
+   return writePref("visual_markdown_code_editor", val);
+}
+
+/**
+ * Zotero libraries to insert citations from.
+ */
+core::json::Array UserPrefValues::zoteroLibraries()
+{
+   return readPref<core::json::Array>("zotero_libraries");
+}
+
+core::Error UserPrefValues::setZoteroLibraries(core::json::Array val)
+{
+   return writePref("zotero_libraries", val);
+}
+
+/**
+ * Preferred emoji skintone
+ */
+std::string UserPrefValues::emojiSkintone()
+{
+   return readPref<std::string>("emoji_skintone");
+}
+
+core::Error UserPrefValues::setEmojiSkintone(std::string val)
+{
+   return writePref("emoji_skintone", val);
+}
+
+/**
+ * List of aria-live announcements to disable.
+ */
+core::json::Array UserPrefValues::disabledAriaLiveAnnouncements()
+{
+   return readPref<core::json::Array>("disabled_aria_live_announcements");
+}
+
+core::Error UserPrefValues::setDisabledAriaLiveAnnouncements(core::json::Array val)
+{
+   return writePref("disabled_aria_live_announcements", val);
+}
+
+/**
+ * Maximum number of lines of console output announced after a command.
+ */
+int UserPrefValues::screenreaderConsoleAnnounceLimit()
+{
+   return readPref<int>("screenreader_console_announce_limit");
+}
+
+core::Error UserPrefValues::setScreenreaderConsoleAnnounceLimit(int val)
+{
+   return writePref("screenreader_console_announce_limit", val);
+}
+
+/**
+ * List of path components; file monitor will ignore paths containing one or more of these components.
+ */
+core::json::Array UserPrefValues::fileMonitorIgnoredComponents()
+{
+   return readPref<core::json::Array>("file_monitor_ignored_components");
+}
+
+core::Error UserPrefValues::setFileMonitorIgnoredComponents(core::json::Array val)
+{
+   return writePref("file_monitor_ignored_components", val);
+}
+
+/**
+ * Whether to install R package dependencies one at a time.
+ */
+bool UserPrefValues::installPkgDepsIndividually()
+{
+   return readPref<bool>("install_pkg_deps_individually");
+}
+
+core::Error UserPrefValues::setInstallPkgDepsIndividually(bool val)
+{
+   return writePref("install_pkg_deps_individually", val);
+}
+
+/**
+ * R graphics backend.
+ */
+std::string UserPrefValues::graphicsBackend()
+{
+   return readPref<std::string>("graphics_backend");
+}
+
+core::Error UserPrefValues::setGraphicsBackend(std::string val)
+{
+   return writePref("graphics_backend", val);
+}
+
+/**
+ * Type of anti-aliasing to be used for generated R plots.
+ */
+std::string UserPrefValues::graphicsAntialiasing()
+{
+   return readPref<std::string>("graphics_antialiasing");
+}
+
+core::Error UserPrefValues::setGraphicsAntialiasing(std::string val)
+{
+   return writePref("graphics_antialiasing", val);
+}
+
+/**
+ * List of fixed-width fonts to check for browser support.
+ */
+core::json::Array UserPrefValues::browserFixedWidthFonts()
+{
+   return readPref<core::json::Array>("browser_fixed_width_fonts");
+}
+
+core::Error UserPrefValues::setBrowserFixedWidthFonts(core::json::Array val)
+{
+   return writePref("browser_fixed_width_fonts", val);
+}
+
+/**
+ * The Python type.
+ */
+std::string UserPrefValues::pythonType()
+{
+   return readPref<std::string>("python_type");
+}
+
+core::Error UserPrefValues::setPythonType(std::string val)
+{
+   return writePref("python_type", val);
+}
+
+/**
+ * The Python version.
+ */
+std::string UserPrefValues::pythonVersion()
+{
+   return readPref<std::string>("python_version");
+}
+
+core::Error UserPrefValues::setPythonVersion(std::string val)
+{
+   return writePref("python_version", val);
+}
+
+/**
+ * The path to the default Python interpreter.
+ */
+std::string UserPrefValues::pythonPath()
+{
+   return readPref<std::string>("python_path");
+}
+
+core::Error UserPrefValues::setPythonPath(std::string val)
+{
+   return writePref("python_path", val);
+}
+
+/**
+ * The maximum amount of seconds of retry for save operations.
+ */
+int UserPrefValues::saveRetryTimeout()
+{
+   return readPref<int>("save_retry_timeout");
+}
+
+core::Error UserPrefValues::setSaveRetryTimeout(int val)
+{
+   return writePref("save_retry_timeout", val);
+}
+
+/**
+ * Whether the Insert Pipe Operator command should insert the native R pipe operator, |>
+ */
+bool UserPrefValues::insertNativePipeOperator()
+{
+   return readPref<bool>("insert_native_pipe_operator");
+}
+
+core::Error UserPrefValues::setInsertNativePipeOperator(bool val)
+{
+   return writePref("insert_native_pipe_operator", val);
+}
+
+/**
+ * Whether to keep track of recently used commands in the Command Palette
+ */
+bool UserPrefValues::commandPaletteMru()
+{
+   return readPref<bool>("command_palette_mru");
+}
+
+core::Error UserPrefValues::setCommandPaletteMru(bool val)
+{
+   return writePref("command_palette_mru", val);
+}
+
+/**
+ * Whether to compute and show memory usage in the Environment Pane
+ */
+bool UserPrefValues::showMemoryUsage()
+{
+   return readPref<bool>("show_memory_usage");
+}
+
+core::Error UserPrefValues::setShowMemoryUsage(bool val)
+{
+   return writePref("show_memory_usage", val);
+}
+
+/**
+ * How many seconds to wait between automatic requeries of memory statistics (0 to disable)
+ */
+int UserPrefValues::memoryQueryIntervalSeconds()
+{
+   return readPref<int>("memory_query_interval_seconds");
+}
+
+core::Error UserPrefValues::setMemoryQueryIntervalSeconds(int val)
+{
+   return writePref("memory_query_interval_seconds", val);
+}
+
+/**
+ * Enable Python terminal hooks. When enabled, the RStudio-configured version of Python will be placed on the PATH.
+ */
+bool UserPrefValues::terminalPythonIntegration()
+{
+   return readPref<bool>("terminal_python_integration");
+}
+
+core::Error UserPrefValues::setTerminalPythonIntegration(bool val)
+{
+   return writePref("terminal_python_integration", val);
+}
+
 std::vector<std::string> UserPrefValues::allKeys()
 {
    return std::vector<std::string>({
@@ -2113,6 +2906,7 @@ std::vector<std::string> UserPrefValues::allKeys()
       kHighlightSelectedWord,
       kHighlightSelectedLine,
       kPanes,
+      kAllowSourceColumns,
       kUseSpacesForTab,
       kNumSpacesForTab,
       kAutoDetectIndentation,
@@ -2122,11 +2916,13 @@ std::vector<std::string> UserPrefValues::allKeys()
       kShowInvisibles,
       kShowIndentGuides,
       kContinueCommentsOnNewline,
+      kHighlightWebLink,
       kEditorKeybindings,
       kInsertMatching,
       kInsertSpacesAroundEquals,
       kInsertParensAfterFunctionCompletion,
       kTabMultilineCompletion,
+      kTabCompletion,
       kShowHelpTooltipOnIdle,
       kSurroundSelection,
       kEnableSnippets,
@@ -2155,19 +2951,27 @@ std::vector<std::string> UserPrefValues::allKeys()
       kReindentOnPaste,
       kVerticallyAlignArgumentsIndent,
       kSoftWrapRFiles,
+      kSoftWrapRmdFiles,
       kFocusConsoleAfterExec,
       kFoldStyle,
       kSaveBeforeSourcing,
       kSyntaxColorConsole,
+      kHighlightConsoleErrors,
       kScrollPastEndOfDocument,
       kHighlightRFunctionCalls,
+      kRainbowParentheses,
       kConsoleLineLengthLimit,
+      kConsoleMaxLines,
       kAnsiConsoleMode,
+      kLimitVisibleConsole,
       kShowInlineToolbarForRCodeChunks,
       kHighlightCodeChunks,
       kSaveFilesBeforeBuild,
       kFontSizePoints,
+      kHelpFontSizePoints,
       kEditorTheme,
+      kServerEditorFontEnabled,
+      kServerEditorFont,
       kDefaultEncoding,
       kToolbarVisible,
       kDefaultProjectLocation,
@@ -2185,8 +2989,6 @@ std::vector<std::string> UserPrefValues::allKeys()
       kDocumentLoadLintDelay,
       kIgnoreUppercaseWords,
       kIgnoreWordsWithNumbers,
-      kMaxSpellcheckWords,
-      kMaxSpellcheckPrefetch,
       kRealTimeSpellchecking,
       kNavigateToBuildError,
       kPackagesPaneEnabled,
@@ -2197,6 +2999,7 @@ std::vector<std::string> UserPrefValues::allKeys()
       kCheckForUpdates,
       kShowInternalFunctions,
       kShinyViewerType,
+      kShinyBackgroundJobs,
       kPlumberViewerType,
       kDocumentAuthor,
       kRmdPreferredTemplatePath,
@@ -2213,11 +3016,17 @@ std::vector<std::string> UserPrefValues::allKeys()
       kShowTerminalTab,
       kTerminalLocalEcho,
       kTerminalWebsockets,
-      kTerminalAutoClose,
+      kTerminalCloseBehavior,
       kTerminalTrackEnvironment,
+      kTerminalBellStyle,
+      kTerminalRenderer,
+      kTerminalWeblinks,
       kShowRmdRenderCommand,
       kEnableTextDrag,
       kShowHiddenFiles,
+      kAlwaysShownFiles,
+      kAlwaysShownExtensions,
+      kSortFileNamesNaturally,
       kJobsTabVisibility,
       kShowLauncherJobsTab,
       kLauncherJobsSort,
@@ -2235,6 +3044,7 @@ std::vector<std::string> UserPrefValues::allKeys()
       kShowUserHomePage,
       kReuseSessionsForProjectLinks,
       kVcsEnabled,
+      kVcsAutorefresh,
       kGitExePath,
       kSvnExePath,
       kTerminalPath,
@@ -2246,12 +3056,56 @@ std::vector<std::string> UserPrefValues::allKeys()
       kViewDirAfterRCmdCheck,
       kHideObjectFiles,
       kRestoreLastProject,
+      kProjectSafeStartupSeconds,
+      kUseTinytex,
       kCleanTexi2dviOutput,
       kLatexShellEscape,
       kRestoreProjectRVersion,
       kClangVerbose,
       kSubmitCrashReports,
       kDefaultRVersion,
+      kDataViewerMaxColumns,
+      kEnableScreenReader,
+      kTypingStatusDelayMs,
+      kReducedMotion,
+      kTabKeyMoveFocus,
+      kFindPanelLegacyTabSequence,
+      kShowFocusRectangles,
+      kShowPanelFocusRectangle,
+      kAutoSaveOnIdle,
+      kAutoSaveIdleMs,
+      kAutoSaveOnBlur,
+      kTerminalInitialDirectory,
+      kFullProjectPathInWindowTitle,
+      kVisualMarkdownEditingIsDefault,
+      kVisualMarkdownEditingListSpacing,
+      kVisualMarkdownEditingWrap,
+      kVisualMarkdownEditingWrapAtColumn,
+      kVisualMarkdownEditingReferencesLocation,
+      kVisualMarkdownEditingCanonical,
+      kVisualMarkdownEditingMaxContentWidth,
+      kVisualMarkdownEditingShowDocOutline,
+      kVisualMarkdownEditingShowMargin,
+      kVisualMarkdownEditingFontSizePoints,
+      kVisualMarkdownCodeEditor,
+      kZoteroLibraries,
+      kEmojiSkintone,
+      kDisabledAriaLiveAnnouncements,
+      kScreenreaderConsoleAnnounceLimit,
+      kFileMonitorIgnoredComponents,
+      kInstallPkgDepsIndividually,
+      kGraphicsBackend,
+      kGraphicsAntialiasing,
+      kBrowserFixedWidthFonts,
+      kPythonType,
+      kPythonVersion,
+      kPythonPath,
+      kSaveRetryTimeout,
+      kInsertNativePipeOperator,
+      kCommandPaletteMru,
+      kShowMemoryUsage,
+      kMemoryQueryIntervalSeconds,
+      kTerminalPythonIntegration,
    });
 }
    

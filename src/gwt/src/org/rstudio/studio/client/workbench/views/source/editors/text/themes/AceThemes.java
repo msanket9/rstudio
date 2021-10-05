@@ -1,7 +1,7 @@
 /*
  * AceThemes.java
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -28,6 +28,7 @@ import com.google.inject.Singleton;
 
 import org.rstudio.core.client.ColorUtil.RGBColor;
 import org.rstudio.core.client.Debug;
+import org.rstudio.core.client.StringUtil;
 import org.rstudio.core.client.dom.DomUtils;
 import org.rstudio.core.client.widget.Operation;
 import org.rstudio.core.client.widget.ProgressIndicator;
@@ -51,11 +52,13 @@ public class AceThemes
    @Inject
    public AceThemes(ThemeServerOperations themeServerOperations,
                     final Provider<UserState> state,
+                    final Provider<UserPrefs> prefs,
                     EventBus events)
    {
       themeServerOperations_ = themeServerOperations;
       events_ = events;
       state_ = state;
+      prefs_ = prefs;
       themes_ = new HashMap<>();
 
       state.get().theme().bind(theme -> applyTheme((AceTheme)theme.cast()));
@@ -63,20 +66,50 @@ public class AceThemes
    
    private void applyTheme(Document document, final AceTheme theme)
    {
+      final String linkId = "rstudio-acethemes-linkelement";
+
       // Build the URL.
       StringBuilder themeUrl = new StringBuilder();
       themeUrl.append(GWT.getHostPageBaseURL())
          .append(theme.getUrl())
          .append("?dark=")
-         .append(theme.isDark() ? "1" : "0");
+         .append(theme.isDark() ? "1" : "0")
+         .append("&refresh=1");
       
       LinkElement currentStyleEl = document.createLinkElement();
       currentStyleEl.setType("text/css");
       currentStyleEl.setRel("stylesheet");
-      currentStyleEl.setId(linkId_);
+      currentStyleEl.setId(linkId);
       currentStyleEl.setHref(themeUrl.toString());
+      
+      // In server mode, augment the theme with a font if we have one
+      if (!Desktop.isDesktop() && prefs_.get().serverEditorFontEnabled().getValue())
+      {
+         String font = prefs_.get().serverEditorFont().getValue();
+         if (!StringUtil.isNullOrEmpty(font))
+         {
+            final String fontId = "rstudio-fontelement";
+            LinkElement fontEl = document.createLinkElement();
+            fontEl.setType("text/css");
+            fontEl.setRel("stylesheet");
+            fontEl.setId(fontId);
+            fontEl.setHref(
+                  GWT.getHostPageBaseURL() + 
+                  "fonts/css/" + 
+                  font + ".css");
+            Element oldFontEl = document.getElementById(fontId);
+            if (null != oldFontEl)
+            {
+              document.getBody().replaceChild(fontEl, oldFontEl);
+            }
+            else
+            {
+               document.getBody().appendChild(fontEl);
+            }
+         }
+      }
    
-      Element oldStyleEl = document.getElementById(linkId_);
+      Element oldStyleEl = document.getElementById(linkId);
       if (null != oldStyleEl)
       {
         document.getBody().replaceChild(currentStyleEl, oldStyleEl);
@@ -250,6 +283,6 @@ public class AceThemes
    private ThemeServerOperations themeServerOperations_;
    private final EventBus events_;
    private final Provider<UserState> state_;
-   private final String linkId_ = "rstudio-acethemes-linkelement";
+   private final Provider<UserPrefs> prefs_;
    private HashMap<String, AceTheme> themes_;
 }

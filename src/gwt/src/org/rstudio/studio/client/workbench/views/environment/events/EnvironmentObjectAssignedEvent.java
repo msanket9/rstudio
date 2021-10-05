@@ -1,7 +1,7 @@
 /*
  * EnvironmentObjectAssignedEvent.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -28,12 +28,11 @@ public class EnvironmentObjectAssignedEvent
       void onEnvironmentObjectAssigned(EnvironmentObjectAssignedEvent event);
    }
 
-   public static final GwtEvent.Type<EnvironmentObjectAssignedEvent.Handler> TYPE =
-      new GwtEvent.Type<EnvironmentObjectAssignedEvent.Handler>();
+   public static final GwtEvent.Type<EnvironmentObjectAssignedEvent.Handler> TYPE = new GwtEvent.Type<>();
    
    public EnvironmentObjectAssignedEvent(RObject objectInfo)
    {
-      objectInfo_ = objectInfo ;
+      objectInfo_ = objectInfo;
    }
    
    public RObject getObjectInfo()

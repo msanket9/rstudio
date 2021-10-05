@@ -1,7 +1,7 @@
 /*
  * PrefLayer.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,6 +16,7 @@
 #include <session/prefs/PrefLayer.hpp>
 
 #include <core/FileSerializer.hpp>
+#include <core/Algorithm.hpp>
 
 using namespace rstudio::core;
 
@@ -24,9 +25,50 @@ namespace session {
 namespace prefs {
 namespace {
 
+enum class PrefErrorCode
+{
+   SUCCESS = 0,
+   LOAD_ERROR = 1,
+   WRITE_ERROR = 2,
+   UNKNOWN_ERROR = 3
+};
+
+Error prefsError(PrefErrorCode code, const Error& cause, const ErrorLocation& location)
+{
+   switch (code)
+   {
+      case PrefErrorCode::SUCCESS:
+         return Success();
+      case PrefErrorCode::LOAD_ERROR:
+         return Error(
+            "pref_error",
+            static_cast<int>(PrefErrorCode::LOAD_ERROR),
+            "Error occurred while loading preferences.",
+            cause,
+            location);
+      case PrefErrorCode::WRITE_ERROR:
+         return Error(
+            "pref_error",
+            static_cast<int>(PrefErrorCode::WRITE_ERROR),
+            "Error occurred while writing preferences.",
+            cause,
+            location);
+      default:
+      {
+         assert(false);
+         return Error(
+            "pref_error",
+            static_cast<int>(PrefErrorCode::UNKNOWN_ERROR),
+            "Unknown preferences error.",
+            cause,
+            location);
+      }
+   }
+}
+
 bool prefsFileFilter(const core::FilePath& prefsFile, const core::FileInfo& fileInfo)
 {
-   return prefsFile.absolutePath() == fileInfo.absolutePath();
+   return prefsFile.getAbsolutePath() == fileInfo.absolutePath();
 }
 
 } // anonymous namespace
@@ -38,6 +80,11 @@ PrefLayer::PrefLayer(const std::string& layerName):
 }
 
 PrefLayer::~PrefLayer()
+{
+   destroy();
+}
+
+void PrefLayer::destroy()
 {
    // End file monitoring if not already terminated
    if (handle_)
@@ -64,7 +111,8 @@ Error PrefLayer::writePrefs(const core::json::Object &prefs)
    return systemError(boost::system::errc::function_not_supported, ERROR_LOCATION);
 }
 
-Error PrefLayer::loadPrefsFromFile(const core::FilePath &prefsFile)
+Error PrefLayer::loadPrefsFromFile(const core::FilePath& prefsFile, 
+                                   const core::FilePath& schemaFile)
 {
    json::Value val;
    std::string contents;
@@ -72,9 +120,13 @@ Error PrefLayer::loadPrefsFromFile(const core::FilePath &prefsFile)
    if (error)
    {
       // No prefs file; use an empty cache
-      cache_ = boost::make_shared<json::Object>();
+      RECURSIVE_LOCK_MUTEX(mutex_)
+      {
+         cache_ = boost::make_shared<json::Object>();
+      }
+      END_LOCK_MUTEX
 
-      if (!isFileNotFoundError(error))
+      if (!isNotFoundError(error))
       {
          // If we hit an unexpected error (e.g. permission denied), it's still not fatal (we can live
          // without a prefs file) but users might like to know.
@@ -83,24 +135,68 @@ Error PrefLayer::loadPrefsFromFile(const core::FilePath &prefsFile)
       return Success();
    }
 
-   error = json::parse(contents, ERROR_LOCATION, &val);
+   error = val.parse(contents);
    if (error)
    {
-      // Couldn't parse prefs JSON
-      return error;
+      // Couldn't parse prefs JSON; use empty cache
+      error = prefsError(PrefErrorCode::LOAD_ERROR, error, ERROR_LOCATION);
    }
-   else if (val.type() == json::ObjectType)
+   else if (val.isObject())
    {
-      // Successful parse of prefs object
-      cache_ = boost::make_shared<json::Object>(val.get_obj());
+      // Attempt to coerce the value to fit the schema, if provided
+      if (!schemaFile.isEmpty())
+      {
+         error = readStringFromFile(schemaFile, &contents);
+         if (!error)
+         {
+            std::vector<std::string> violations;
+            error = val.coerce(contents, violations);
+            if (error)
+            {
+               // We could not coerce the prefs to fit the schema.
+               error = prefsError(PrefErrorCode::LOAD_ERROR, error, ERROR_LOCATION);
+            }
+            else if (violations.size() > 0)
+            {
+               // We made the prefs fit the schema, but had to discard some values to make it work.
+               // Log a warning.
+               LOG_WARNING_MESSAGE("Invalid values found in " + 
+                  prefsFile.getAbsolutePath() + ": " + 
+                  algorithm::join(violations, ", "));
+            }
+         }
+      }
+      // Successful parse of valid prefs object
+      RECURSIVE_LOCK_MUTEX(mutex_)
+      {
+         cache_ = boost::make_shared<json::Object>(val.getObject());
+      }
+      END_LOCK_MUTEX
    }
    else
    {
       // We parsed but got a non-object JSON value (this is exceedingly unlikely)
-      return Error(rapidjson::kParseErrorValueInvalid, ERROR_LOCATION);
+      error = Error(
+         "pref_error",
+         static_cast<int>(PrefErrorCode::LOAD_ERROR),
+         "Invalid value while parsing preferences: " + val.write(),
+         ERROR_LOCATION);
    }
 
-   return Success();
+   // If there was an error and no cache yet, create an empty one as a convenience 
+   if (error)
+   {
+      RECURSIVE_LOCK_MUTEX(mutex_)
+      {
+         if (!cache_)
+         {
+            cache_ = boost::make_shared<json::Object>();
+         }
+      }
+      END_LOCK_MUTEX
+   }
+
+   return error;
 }
 
 Error PrefLayer::loadPrefsFromSchema(const core::FilePath &schemaFile)
@@ -110,19 +206,40 @@ Error PrefLayer::loadPrefsFromSchema(const core::FilePath &schemaFile)
    if (error)
       return error;
 
-   cache_ = boost::make_shared<json::Object>();
-   return json::getSchemaDefaults(contents, cache_.get());
+   RECURSIVE_LOCK_MUTEX(mutex_)
+   {
+      cache_ = boost::make_shared<json::Object>();
+      error = json::Object::getSchemaDefaults(contents, *cache_);
+   }
+   END_LOCK_MUTEX
+
+   return error;
 }
 
 Error PrefLayer::validatePrefsFromSchema(const core::FilePath &schemaFile)
 {
-   json::Value val;
-   std::string contents;
-   Error error = readStringFromFile(schemaFile, &contents);
-   if (error)
-      return error;
+   RECURSIVE_LOCK_MUTEX(mutex_)
+   {
+      if (cache_ && cache_->isObject())
+      {
+         std::string contents;
+         Error error = readStringFromFile(schemaFile, &contents);
+         if (error)
+            return error;
 
-  return json::validate(*cache_, contents, ERROR_LOCATION);
+         error = cache_->validate(contents);
+         if (error)
+            return prefsError(PrefErrorCode::LOAD_ERROR, error, ERROR_LOCATION);
+      }
+      else
+      {
+         // We won't technically fail validation here, but we shouldn't try to validate before reading.
+         LOG_WARNING_MESSAGE("Attempt to validate prefs before they were read.");
+      }
+   }
+   END_LOCK_MUTEX
+
+   return Success();
 }
 
 Error PrefLayer::writePrefsToFile(const core::json::Object& prefs, const core::FilePath& prefsFile)
@@ -132,15 +249,13 @@ Error PrefLayer::writePrefsToFile(const core::json::Object& prefs, const core::F
    // If the preferences file doesn't exist, ensure its directory does.
    if (!prefsFile.exists())
    {
-      error = prefsFile.parent().ensureDirectory();
+      error = prefsFile.getParent().ensureDirectory();
       if (error)
          return error;
    }
 
    // Save the new preferences to file
-   std::ostringstream oss;
-   json::writeFormatted(prefs, oss);
-   error = writeStringToFile(prefsFile, oss.str());
+   error = writeStringToFile(prefsFile, prefs.writeFormatted());
 
    return error;
 }
@@ -155,7 +270,7 @@ boost::optional<core::json::Value> PrefLayer::readValue(const std::string& name)
          // The value doesn't exist in this layer.
          return boost::none;
       }
-      return (*it).value().clone();
+      return (*it).getValue().clone();
    }
    END_LOCK_MUTEX
 
@@ -209,7 +324,7 @@ void PrefLayer::fileMonitorTermination(const Error& error)
       LOG_ERROR(error);
 
    // Clear file monitoring handle
-   handle_ = boost::none; 
+   handle_ = boost::none;
 }
 
 void PrefLayer::monitorPrefsFile(const core::FilePath& prefsFile)
@@ -229,7 +344,7 @@ void PrefLayer::monitorPrefsFile(const core::FilePath& prefsFile)
    cb.onMonitoringError = bind(&PrefLayer::fileMonitorTermination, this, _1);
    cb.onFilesChanged = bind(&PrefLayer::fileMonitorFilesChanged, this, _1);
    cb.onUnregistered = bind(&PrefLayer::fileMonitorTermination, this, Success());
-   core::system::file_monitor::registerMonitor(prefsFile.parent(), 
+   core::system::file_monitor::registerMonitor(prefsFile.getParent(),
          false /* recursive */, 
          bind(prefsFileFilter, prefsFile, _1),
          cb);

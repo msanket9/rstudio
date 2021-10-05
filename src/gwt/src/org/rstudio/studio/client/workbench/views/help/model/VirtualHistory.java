@@ -1,7 +1,7 @@
 /*
  * VirtualHistory.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -61,10 +61,10 @@ public class VirtualHistory
    {
       // truncate the stack to the current pos
       while (stack_.size() > pos_ + 1)
-         stack_.remove(stack_.size() - 1) ;
+         stack_.remove(stack_.size() - 1);
       
       saveScrollPosition();
-      stack_.add(new Data(url)) ;
+      stack_.add(new Data(url));
       pos_ = stack_.size() - 1;
    }
 
@@ -85,7 +85,7 @@ public class VirtualHistory
          return null;
       
       saveScrollPosition();
-      pos_++ ;
+      pos_++;
 
       return stack_.get(pos_);
    }
@@ -103,6 +103,6 @@ public class VirtualHistory
    }
    
    private final Frame frame_;
-   private List<Data> stack_ = new ArrayList<Data>();
+   private List<Data> stack_ = new ArrayList<>();
    private int pos_ = -1;
 }

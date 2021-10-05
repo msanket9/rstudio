@@ -1,7 +1,7 @@
 /*
  * PrefLayer.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,7 +16,7 @@
 #ifndef SESSION_PREF_LAYER_HPP
 #define SESSION_PREF_LAYER_HPP
 
-#include <core/json/Json.hpp>
+#include <shared_core/json/Json.hpp>
 #include <core/json/JsonRpc.hpp>
 
 #include <core/system/FileMonitor.hpp>
@@ -42,8 +42,8 @@ public:
    PrefLayer(const std::string& layerName);
    virtual core::Error readPrefs() = 0;
    virtual core::Error writePrefs(const core::json::Object& prefs);
-   virtual core::Error validatePrefs() = 0;
    virtual ~PrefLayer();
+   virtual void destroy();
    std::string layerName();
 
    template<typename T> boost::optional<T> readPref(const std::string& name)
@@ -63,18 +63,18 @@ public:
          if (it != cache_->end())
          {
             // Ensure the preference we found is of the correct type. 
-            if (!core::json::isType<T>((*it).value()))
+            if (!core::json::isType<T>((*it).getValue()))
             {  
                core::Error error(core::json::errc::ParamTypeMismatch, ERROR_LOCATION);
                error.addProperty("description", "unexpected type "
-                     "'" + core::json::typeAsString((*it).value()) + "'"
+                     "'" + core::json::typeAsString((*it).getValue()) + "'"
                      " for preference '" + name + "' in layer '" + layerName() + "'");
                LOG_ERROR(error);
                return boost::none;
             }
 
             // Return the preference
-            return (*it).value().get_value<T>();
+            return (*it).getValue().getValue<T>();
          }
       }
       END_LOCK_MUTEX;
@@ -118,7 +118,7 @@ public:
 
 protected:
    // I/O methods
-   core::Error loadPrefsFromFile(const core::FilePath& prefsFile);
+   core::Error loadPrefsFromFile(const core::FilePath& prefsFile, const core::FilePath& schemaFile);
    core::Error loadPrefsFromSchema(const core::FilePath& schemaFile);
    core::Error writePrefsToFile(const core::json::Object& prefs, const core::FilePath& prefsFile);
 

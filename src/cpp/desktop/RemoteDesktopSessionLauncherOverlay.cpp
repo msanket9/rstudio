@@ -1,7 +1,7 @@
 /*
  * RemoteDesktopSessionLauncherOverlay.cpp
  *
- * Copyright (C) 2019 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -20,7 +20,22 @@ using namespace rstudio::core;
 namespace rstudio {
 namespace desktop {
 
-void RemoteDesktopSessionLauncher::launchFirstSession()
+void RemoteDesktopSessionLauncher::launchFirstSession(const core::FilePath& installPath,
+                                                      bool devMode,
+                                                      const QStringList& arguments)
+{
+}
+
+std::map<std::string, QNetworkCookie> RemoteDesktopSessionLauncher::getCookies()
+{
+   return std::map<std::string, QNetworkCookie>();
+}
+
+void RemoteDesktopSessionLauncher::onLaunchError(QString message)
+{
+}
+
+void RemoteDesktopSessionLauncher::onLaunchFirstSession()
 {
 }
 
@@ -63,6 +78,10 @@ void RemoteDesktopSessionLauncher::handleLaunchError(const Error& error)
 }
 
 void RemoteDesktopSessionLauncher::closeAllSatellites()
+{
+}
+
+void RemoteDesktopSessionLauncher::closeOnSignOut()
 {
 }
 

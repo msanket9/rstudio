@@ -1,7 +1,7 @@
 /*
  * ImagePreviewer.java
  *
- * Copyright (C) 2009-16 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -29,7 +29,6 @@ import org.rstudio.core.client.regex.Pattern;
 import org.rstudio.studio.client.common.FilePathUtils;
 import org.rstudio.studio.client.rmarkdown.model.RmdChunkOptions;
 import org.rstudio.studio.client.workbench.prefs.model.UserPrefs;
-import org.rstudio.studio.client.workbench.prefs.model.UserPrefUtils;
 import org.rstudio.studio.client.workbench.views.source.editors.text.ace.LineWidget;
 import org.rstudio.studio.client.workbench.views.source.editors.text.ace.Position;
 import org.rstudio.studio.client.workbench.views.source.editors.text.ace.Range;
@@ -150,12 +149,10 @@ public class ImagePreviewer
          return;
       
       // shared mutable state that we hide in this closure
-      final Mutable<PinnedLineWidget>  plw = new Mutable<PinnedLineWidget>();
-      final Mutable<ChunkOutputWidget> cow = new Mutable<ChunkOutputWidget>();
-      final Mutable<HandlerRegistration> docChangedHandler = 
-            new Mutable<HandlerRegistration>(); 
-      final Mutable<HandlerRegistration> renderHandler = 
-            new Mutable<HandlerRegistration>();
+      final Mutable<PinnedLineWidget>  plw = new Mutable<>();
+      final Mutable<ChunkOutputWidget> cow = new Mutable<>();
+      final Mutable<HandlerRegistration> docChangedHandler = new Mutable<>(); 
+      final Mutable<HandlerRegistration> renderHandler = new Mutable<>();
       
       // command that ensures state is cleaned up when widget hidden
       final Command onDetach = new Command()
@@ -498,11 +495,18 @@ public class ImagePreviewer
           href.endsWith(".jpg")  ||
           href.endsWith(".jpeg") ||
           href.endsWith(".gif")  ||
-          href.endsWith(".svg");
+          href.endsWith(".svg")  ||
+          href.endsWith(".webp");
+   }
+   
+   public static String imgSrcPathFromHref(DocUpdateSentinel sentinel, String href)
+   {
+      String docPath = sentinel.getPath();
+      String docDir = FilePathUtils.dirFromFile(docPath);
+      return imgSrcPathFromHref(docDir, href);
    }
 
-   private static String imgSrcPathFromHref(DocUpdateSentinel sentinel, 
-                                            String href)
+   public static String imgSrcPathFromHref(String docDir, String href)
    {
       // return paths that have a custom / external protocol as-is
       Pattern reProtocol = Pattern.create("^\\w+://");
@@ -513,8 +517,7 @@ public class ImagePreviewer
       String absPath = href;
       if (FilePathUtils.pathIsRelative(href))
       {
-         String docPath = sentinel.getPath();
-         absPath = FilePathUtils.dirFromFile(docPath) + "/" + absPath;
+         absPath = docDir + "/" + absPath;
       }
       
       return "file_show?path=" + StringUtil.encodeURIComponent(absPath) + 
@@ -557,6 +560,10 @@ public class ImagePreviewer
          return;
       }
       
+      // don't show preview if we are in visual mode
+      if (sentinel.getBoolProperty(TextEditingTarget.RMD_VISUAL_MODE, false))
+         return;
+      
       // construct image el, place in popup, and show
       ImagePreviewPopup panel = new ImagePreviewPopup(display, tokenRange, 
             href, imgSrcPathFromHref(sentinel, href));
@@ -572,7 +579,7 @@ public class ImagePreviewer
    private final DocUpdateSentinel sentinel_;
    private final UserPrefs prefs_;
 
-   private static final String LINE_WIDGET_TYPE = "image-preview" ;
+   private static final String LINE_WIDGET_TYPE = "image-preview";
    private static int IMAGE_ID = 0;
    
    interface Styles extends CssResource

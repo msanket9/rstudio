@@ -1,7 +1,7 @@
 /*
  * SessionUserCommands.cpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -19,10 +19,12 @@
 
 #include "SessionUserCommands.hpp"
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Exec.hpp>
+
+#include <core/system/Xdg.hpp>
 
 #include <r/RExec.hpp>
 #include <r/RSexp.hpp>
@@ -36,6 +38,7 @@ namespace modules {
 namespace user_commands {
 
 using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace {
 
@@ -107,6 +110,9 @@ SEXP rs_registerUserCommand(SEXP nameSEXP, SEXP shortcutsSEXP)
 void onDeferredInit(bool newSession)
 {
    r::exec::RFunction loadUserCommands(".rs.loadUserCommands");
+   loadUserCommands.addParam("keybindingPath", 
+         core::system::xdg::userConfigDir().completePath("keybindings").getAbsolutePath());
+         
    Error error = loadUserCommands.call();
    if (error)
       LOG_ERROR(error);

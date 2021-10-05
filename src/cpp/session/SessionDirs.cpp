@@ -1,7 +1,7 @@
 /*
  * SessionDirs.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -29,14 +29,21 @@ namespace dirs {
 
 FilePath getDefaultWorkingDirectory()
 {
-   // calculate using user settings
-   FilePath defaultWorkingDir = module_context::resolveAliasedPath(
-         prefs::userPrefs().initialWorkingDirectory());
+   // see if the user has defined a default working directory in preferences
+   FilePath defaultWorkingDir;
+   std::string initialWorkingDir = prefs::userPrefs().initialWorkingDirectory();
+   if (!initialWorkingDir.empty())
+   {
+      // the user has defined a default; resolve the path
+      defaultWorkingDir = module_context::resolveAliasedPath(initialWorkingDir);
+   }
+
+   // see if there's a working directory defined in the R session options (set by
+   // session-default-working-dir)
    FilePath sessionDefaultWorkingDir = FilePath(session::options().defaultWorkingDir());
 
-   // return it if it exists, otherwise use the
-   // session specified value if it exists
-   // otherwise, use the default user home path
+   // return the first of these directories that is defined and exists, or the user home directory
+   // in the case that neither exists
    if (defaultWorkingDir.exists() && defaultWorkingDir.isDirectory())
       return defaultWorkingDir;
    else if (sessionDefaultWorkingDir.exists() && sessionDefaultWorkingDir.isDirectory())
@@ -98,11 +105,11 @@ FilePath getProjectUserDataDir(const ErrorLocation& location)
    // for a .Ruserdata directory as an alternative
    FilePath dataDir = projectDir;
 
-   FilePath ruserdataDir = projectDir.childPath(".Ruserdata");
+   FilePath ruserdataDir = projectDir.completeChildPath(".Ruserdata");
    if (ruserdataDir.exists())
    {
       // create user-specific subdirectory if necessary
-      FilePath userDir = ruserdataDir.childPath(core::system::username());
+      FilePath userDir = ruserdataDir.completeChildPath(core::system::username());
       Error error = userDir.ensureDirectory();
       if (!error)
       {

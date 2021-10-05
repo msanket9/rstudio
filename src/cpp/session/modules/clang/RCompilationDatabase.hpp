@@ -1,7 +1,7 @@
 /*
  * RCompilationDatabase.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -22,8 +22,8 @@
 
 #include <boost/noncopyable.hpp>
 
-#include <core/Error.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/Error.hpp>
+#include <shared_core/FilePath.hpp>
 
 #include <core/system/Process.hpp>
 #include <core/system/Environment.hpp>
@@ -31,6 +31,14 @@
 #include <core/libclang/LibClang.hpp>
 
 #define kCompilationDbPrefix "clang-compilation-db-"
+
+namespace rstudio {
+namespace core {
+namespace r_util {
+class RPackageInfo;
+} // namespace r_util
+} // namespace core
+} // namespace rstudio
 
 namespace rstudio {
 namespace session {
@@ -67,7 +75,8 @@ private:
    void updateForSourceCpp(const core::FilePath& cppPath);
    std::vector<std::string> compileArgsForPackage(
                                      const core::system::Options& env,
-                                     const core::FilePath& pkgPath);
+                                     const core::FilePath& pkgPath,
+                                     bool isCpp);
 
 
    void savePackageCompilationConfig();
@@ -88,10 +97,13 @@ private:
                                              core::FilePath tempSrcFile);
 
    std::vector<std::string> baseCompilationArgs(bool isCppFile) const;
+   std::vector<std::string> packageCompilationArgs(
+         core::r_util::RPackageInfo* pPkgInfo = nullptr,
+         bool* pIsCpp = nullptr);
+
    std::vector<std::string> rToolsArgs() const;
    core::system::Options compilationEnvironment() const;
-   std::vector<std::string> precompiledHeaderArgs(const std::string& pkgName,
-                                                  const std::string& stdArg);
+   std::vector<std::string> precompiledHeaderArgs(const CompilationConfig& config);
 
    bool shouldIndexConfig(const CompilationConfig& config);
 
@@ -112,8 +124,10 @@ private:
    // package compliation settings (track file modification times on build
    // oriented files to avoid re-running detection)
    std::string packageBuildFileHash_;
+   std::string compilerHash_;
    CompilationConfig packageCompilationConfig_;
    bool usePrecompiledHeaders_;
+   bool forceRebuildPrecompiledHeaders_;
    bool restoredCompilationConfig_;
 };
 

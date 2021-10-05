@@ -1,7 +1,7 @@
 /*
  * FileInfo.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -23,7 +23,7 @@
 #include <string>
 #include <iosfwd>
 
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 
 // TODO: satisfy outselves that it is safe to query for symlink status
 // in all cases and eliminate its "optional" semantics
@@ -38,7 +38,8 @@ public:
       : absolutePath_(), 
         isDirectory_(false), 
         size_(0), 
-        lastWriteTime_(0)
+        lastWriteTime_(0),
+        isSymlink_(false)
    {
    }
    
@@ -52,7 +53,7 @@ public:
    // burned by boost filesystem having nasty beahvior for seemingly
    // innocuous operations before!)
    explicit FileInfo(const FilePath& filePath,
-                     bool isSymlink = false) ;
+                     bool isSymlink = false);
    
    FileInfo(const std::string& absolutePath,
             bool isDirectory,
@@ -85,11 +86,11 @@ public:
    
    bool operator!=(const FileInfo& other) const
    {
-      return !(*this == other); 
+      return !(*this == other);
    }
    
 public:
-   std::string absolutePath() const { return absolutePath_.c_str(); }
+   std::string absolutePath() const { return absolutePath_; }
    bool isDirectory() const { return isDirectory_; }
    uintmax_t size() const { return size_; }
    std::time_t lastWriteTime() const { return lastWriteTime_; }
@@ -147,7 +148,7 @@ inline bool fileInfoIsDirectory(const FileInfo& fileInfo)
    return fileInfo.isDirectory();
 }
    
-std::ostream& operator << (std::ostream& stream, const FileInfo& fileInfo) ;
+std::ostream& operator << (std::ostream& stream, const FileInfo& fileInfo);
 
    
 } // namespace core 

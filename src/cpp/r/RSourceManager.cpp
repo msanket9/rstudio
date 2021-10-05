@@ -1,7 +1,7 @@
 /*
  * RSourceManager.cpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,16 +17,17 @@
 
 #include <algorithm>
 
-#include <boost/bind.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/bind/bind.hpp>
 
-#include <core/Error.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/Error.hpp>
+#include <shared_core/FilePath.hpp>
 #include <core/Log.hpp>
 
 #include <r/RExec.hpp>
 
-using namespace rstudio::core ;
+using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace r {
@@ -34,12 +35,15 @@ namespace r {
    
 SourceManager& sourceManager()
 {
-   static SourceManager instance ;
-   return instance ;
+   static SourceManager instance;
+   return instance;
 }
    
 Error SourceManager::sourceTools(const core::FilePath& filePath)
 {
+   if (!filePath.exists())
+      return fileNotFoundError(filePath, ERROR_LOCATION);
+   
    Error error = sourceLocal(filePath);
    if (error)
       return error;
@@ -96,11 +100,11 @@ void SourceManager::reSourceTools(const core::FilePath& filePath)
 Error SourceManager::source(const FilePath& filePath, bool local)
 {
    std::string localPrefix = local ? "local(" : "";
-   std::string localParam = local ? "TRUE" : "FALSE" ;
+   std::string localParam = local ? "TRUE" : "FALSE";
    std::string localSuffix = local ? ")" : "";
       
    // do \ escaping (for windows)
-   std::string path = filePath.absolutePath();
+   std::string path = filePath.getAbsolutePath();
    boost::algorithm::replace_all(path, "\\", "\\\\");
 
    // Build the code. If this build is targeted for debugging, keep the source
@@ -122,13 +126,13 @@ Error SourceManager::source(const FilePath& filePath, bool local)
    recordSourcedFile(filePath, local);
 
    // source the file
-   return r::exec::executeString(rCode); 
+   return r::exec::executeString(rCode);
 }
 
 void SourceManager::recordSourcedFile(const FilePath& filePath, bool local)
 {
-   SourcedFileInfo fileInfo(filePath.lastWriteTime(), local); 
-   sourcedFiles_[filePath.absolutePath()] = fileInfo ;
+   SourcedFileInfo fileInfo(filePath.getLastWriteTime(), local);
+   sourcedFiles_[filePath.getAbsolutePath()] = fileInfo;
 }
    
 void SourceManager::reloadSourceIfNecessary(
@@ -139,7 +143,7 @@ void SourceManager::reloadSourceIfNecessary(
    SourcedFileInfo fileInfo = value.second;
    
    // compare last write times and source again if necessary
-   double diffTime = std::difftime(sourcedFilePath.lastWriteTime(), 
+   double diffTime = std::difftime(sourcedFilePath.getLastWriteTime(),
                                    fileInfo.lastWriteTime);
    if (diffTime > 0)
    {

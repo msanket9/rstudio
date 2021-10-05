@@ -1,7 +1,7 @@
 /*
  * SessionTerminalShell.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -15,13 +15,17 @@
 
 #include <session/SessionTerminalShell.hpp>
 
+#include <shared_core/FilePath.hpp>
+
 #include <core/Algorithm.hpp>
-#include <core/system/System.hpp>
+#include <core/FileUtils.hpp>
 #include <core/StringUtils.hpp>
+#include <core/system/System.hpp>
 
 #include <session/SessionModuleContext.hpp>
-#include "SessionGit.hpp"
 #include <session/prefs/UserPrefs.hpp>
+
+#include "SessionGit.hpp"
 
 namespace rstudio {
 namespace session {
@@ -38,6 +42,36 @@ void addShell(const core::FilePath& expectedPath,
 {
    if (!checkPathExists || expectedPath.exists())
       pShells->push_back(TerminalShell(type, title, expectedPath, args));
+}
+
+void scanPosixShells(std::vector<TerminalShell>* pShells)
+{
+   bool foundZsh = false;
+   core::FilePath shellsFile("/etc/shells");
+   if (shellsFile.exists())
+   {
+      std::string shells = core::file_utils::readFile(shellsFile);
+      std::vector<std::string> lines;
+      boost::algorithm::split(lines, shells, boost::algorithm::is_any_of("\n"));
+      for (const std::string& line : lines)
+      {
+         std::string trimmedLine = core::string_utils::trimWhitespace(line);
+
+         // skip comments and empty lines
+         if (trimmedLine.empty() || (trimmedLine.size() > 0 && trimmedLine.at(0) == '#'))
+            continue;
+
+         if (!foundZsh && boost::algorithm::ends_with(trimmedLine, "/zsh"))
+         {
+            foundZsh = true;
+            std::vector<std::string> args;
+            args.emplace_back("-l"); // act like a login shell
+            args.emplace_back("-g"); // don't add commands with leading space to history
+            addShell(core::FilePath(trimmedLine), TerminalShell::ShellType::PosixZsh,
+                     "Zsh", args, pShells);
+         }
+      }
+   }
 }
 
 void scanAvailableShells(std::vector<TerminalShell>* pShells)
@@ -93,6 +127,11 @@ void scanAvailableShells(std::vector<TerminalShell>* pShells)
       }
    }
 
+   // Additional Posix Shells
+#ifndef _WIN32
+   scanPosixShells(pShells);
+#endif
+
    // Add user-selectable shell command option
    TerminalShell customShell;
    if (AvailableTerminalShells::getCustomShell(&customShell))
@@ -138,6 +177,8 @@ std::string TerminalShell::getShellName(ShellType type)
       return "Custom";
    case ShellType::NoShell:
       return "User command";
+   case ShellType::PosixZsh:
+      return "Zsh";
    }
    return "Unknown";
 }
@@ -171,6 +212,10 @@ TerminalShell::ShellType TerminalShell::shellTypeFromString(const std::string& s
    {
       return TerminalShell::ShellType::CustomShell;
    }
+   else if (typeStr == kPosixTerminalShellZsh)
+   {
+      return TerminalShell::ShellType::PosixZsh;
+   }
    else // implicitly includes "default"
    {
       return TerminalShell::ShellType::Default;
@@ -201,6 +246,8 @@ std::string TerminalShell::getShellId(ShellType type)
          return kPosixTerminalShellBash;
       case TerminalShell::ShellType::NoShell:
          return kPosixTerminalShellNone;
+      case TerminalShell::ShellType::PosixZsh:
+         return kPosixTerminalShellZsh;
    }
    return kWindowsTerminalShellDefault;
 }
@@ -246,17 +293,23 @@ bool AvailableTerminalShells::getInfo(TerminalShell::ShellType type,
 core::FilePath getGitBashShell()
 {
    core::FilePath gitExePath = modules::git::detectedGitExePath();
-   if (!gitExePath.empty())
+   if (!gitExePath.isEmpty())
    {
-      core::FilePath gitBashPath =
-            gitExePath.parent().parent().complete("usr/bin/bash.exe");
+      // Prefer git-for-windows bash wrapper; it does some setup before it invokes MSYS2's
+      // usr/bin/bash.exe; not using this wrapper causes problems if other Cygwin-based
+      // Posix environments are on path (such as those in RTools4)
+      core::FilePath gitBashPath = gitExePath.getParent().completePath("bash.exe");
       if (gitBashPath.exists())
          return gitBashPath;
-      else
-         return core::FilePath();
+
+      // fall back to old detection behavior in case there's an older version that only
+      // has this installation pattern
+      gitBashPath = gitExePath.getParent().getParent().completePath("usr/bin/bash.exe");
+      if (gitBashPath.exists())
+         return gitBashPath;
    }
-   else
-       return core::FilePath();
+   
+   return core::FilePath();
 }
 
 bool AvailableTerminalShells::getSystemShell(TerminalShell* pShellInfo)
@@ -266,12 +319,16 @@ bool AvailableTerminalShells::getSystemShell(TerminalShell* pShellInfo)
    pShellInfo->type = TerminalShell::ShellType::Cmd64;
    pShellInfo->name = "Command Prompt";
 #else
+   
+   // use default bash shell
    pShellInfo->name = "Bash";
    pShellInfo->type = TerminalShell::ShellType::PosixBash;
    pShellInfo->path = core::FilePath("/usr/bin/env");
    pShellInfo->args.emplace_back("bash");
-   pShellInfo->args.emplace_back("-l"); // act like a login shell
+   pShellInfo->args.emplace_back("-l");  // act like a login shell
+   
 #endif
+   
    return true;
 }
 

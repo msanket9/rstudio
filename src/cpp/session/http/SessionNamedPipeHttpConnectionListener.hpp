@@ -1,7 +1,7 @@
 /*
- * SessionNamedPipeHttpConnectionListener.cpp
+ * SessionNamedPipeHttpConnectionListener.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -12,6 +12,9 @@
  * AGPL (http://www.gnu.org/licenses/agpl-3.0.txt) for more details.
  *
  */
+
+#ifndef SESSION_NAMED_PIPE_HTTP_CONNECTION_LISTENER_HPP
+#define SESSION_NAMED_PIPE_HTTP_CONNECTION_LISTENER_HPP
 
 #include <session/SessionHttpConnectionListener.hpp>
 
@@ -26,7 +29,7 @@
 #include <boost/asio/buffer.hpp>
 
 #include <core/Log.hpp>
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Thread.hpp>
 
 #include <core/http/Request.hpp>
@@ -52,7 +55,7 @@
 
 #include "SessionHttpConnectionUtils.hpp"
 
-using namespace rstudio::core ;
+using namespace rstudio::core;
 
 #define kReadBufferSize 4096
 
@@ -528,3 +531,5 @@ private:
 
 } // namespace session
 } // namespace rstudio
+
+#endif /* SESSION_NAMED_PIPE_HTTP_CONNECTION_LISTENER_HPP */

@@ -1,7 +1,7 @@
 /*
  * RSession.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -22,10 +22,11 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Log.hpp>
 #include <core/Settings.hpp>
 #include <core/Scope.hpp>
+#include <core/system/Architecture.hpp>
 #include <core/system/System.hpp>
 #include <core/system/Environment.hpp>
 #include <core/FileSerializer.hpp>
@@ -117,7 +118,7 @@ SEXP rs_showFile(SEXP titleSEXP, SEXP fileSEXP, SEXP delSEXP)
    try
    {
       std::string file = r::util::fixPath(r::sexp::asString(fileSEXP));
-      FilePath filePath = utils::safeCurrentPath().complete(file);
+      FilePath filePath = utils::safeCurrentPath().completePath(file);
       if (!filePath.exists())
       {
           throw r::exec::RErrorException(
@@ -172,13 +173,13 @@ SEXP rs_browseURL(SEXP urlSEXP)
       else if (URL.find("://") == std::string::npos)
       {
          std::string file = r::util::expandFileName(URL);
-         FilePath filePath = utils::safeCurrentPath().complete(
-                                                   r::util::fixPath(file));
+         FilePath filePath = utils::safeCurrentPath().completePath(
+            r::util::fixPath(file));
          rCallbacks().browseFile(filePath);
       }
       else
       {
-         rCallbacks().browseURL(URL) ;
+         rCallbacks().browseURL(URL);
       }
    }
    CATCH_UNEXPECTED_EXCEPTION
@@ -235,6 +236,47 @@ SEXP rs_GEplayDisplayList()
    return Rf_ScalarLogical(1);
 }
 
+#ifdef __APPLE__
+
+Error validateCompatible(const std::string& rHome)
+{
+   FilePath rsessionPath;
+   Error error = core::system::executablePath(nullptr, &rsessionPath);
+   if (error)
+   {
+      LOG_ERROR(error);
+      return Success();
+   }
+
+   FilePath rLibPath = FilePath(rHome).completeChildPath("lib/libR.dylib");
+   if (!rLibPath.exists())
+   {
+      LOG_ERROR(fileNotFoundError(rLibPath, ERROR_LOCATION));
+      return Success();
+   }
+
+   std::string rsessionArchs = core::system::supportedArchitectures(rsessionPath);
+   std::string rArchs = core::system::supportedArchitectures(rLibPath);
+
+   for (auto arch : { "x86_64", "arm64" })
+   {
+      if (rsessionArchs.find(arch) != std::string::npos &&
+          rArchs.find(arch) != std::string::npos)
+      {
+         return Success();
+      }
+   }
+
+   Error formatError(boost::system::errc::executable_format_error, ERROR_LOCATION);
+   formatError.addProperty("r-home", rHome);
+   formatError.addProperty("r-archs", rArchs);
+   formatError.addProperty("rsession-archs", rsessionArchs);
+   return formatError;
+
+}
+
+#endif
+
 } // end anonymous namespace
    
 Error run(const ROptions& options, const RCallbacks& callbacks) 
@@ -244,7 +286,7 @@ Error run(const ROptions& options, const RCallbacks& callbacks)
    setRCallbacks(callbacks);
    
    // set to default "C" numeric locale as-per R embedding docs
-   setlocale(LC_NUMERIC, "C") ;
+   setlocale(LC_NUMERIC, "C");
    
    // perform R discovery
    r::session::RLocations rLocations;
@@ -261,6 +303,13 @@ Error run(const ROptions& options, const RCallbacks& callbacks)
    // R_LIBS_USER
    if (!s_options.rLibsUser.empty())
       core::system::setenv("R_LIBS_USER", s_options.rLibsUser);
+
+#ifdef __APPLE__
+   // validate compatible architecture
+   error = validateCompatible(rLocations.homePath);
+   if (error)
+      return error;
+#endif
    
    // set compatible graphics engine version
    int engineVersion = s_options.rCompatibleGraphicsEngineVersion;
@@ -271,13 +320,14 @@ Error run(const ROptions& options, const RCallbacks& callbacks)
      
    // initialize suspended session path
    FilePath userScratch = s_options.userScratchPath;
-   FilePath oldSuspendedSessionPath = userScratch.complete("suspended-session");
+   FilePath oldSuspendedSessionPath = userScratch.completePath("suspended-session");
    FilePath sessionScratch = s_options.sessionScratchPath;
 
    // set suspend paths
-   setSuspendPaths(sessionScratch.complete("suspended-session-data"), // session data
-      s_options.userScratchPath.complete("client-state"),             // client state
-      s_options.scopedScratchPath.complete("pcs"));                   // project client state
+   setSuspendPaths(
+      sessionScratch.completePath("suspended-session-data"),              // session data
+      s_options.userScratchPath.completePath("client-state"),             // client state
+      s_options.scopedScratchPath.completePath("pcs"));                   // project client state
 
    // one time migration of global suspend to default project suspend
    if (!suspendedSessionPath().exists() && oldSuspendedSessionPath.exists())
@@ -376,7 +426,7 @@ Error run(const ROptions& options, const RCallbacks& callbacks)
                             stdInternalCallbacks());
 
    // keep compiler happy
-   return Success() ;
+   return Success();
 }
 
 namespace {
@@ -402,7 +452,7 @@ void setClientMetrics(const RClientMetrics& metrics)
    {
       // report to user
       std::string errMsg = r::endUserErrorMessage(error);
-      REprintf((errMsg + "\n").c_str());
+      REprintf("%s\n", errMsg.c_str());
 
       // restore previous values (but don't fire plotsChanged b/c
       // the reset doesn't result in a change in graphics state)
@@ -422,13 +472,26 @@ bool isSuspendable(const std::string& currentPrompt)
    // NOTE: active file graphics devices (e.g. png or pdf) are wiped out
    // during a suspend as are open connections. there may or may not be a
    // way to make this more robust.
-
-   // are we not at the default prompt?
-   std::string defaultPrompt = r::options::getOption<std::string>("prompt");
-   if (currentPrompt != defaultPrompt)
-      return false;
-   else
+   
+   if (s_options.suspendOnIncompleteStatement)
+   {
+      // Always allow suspending, even if the statement is not complete.
       return true;
+   }
+   else
+   {
+      // Avoid suspending when the prompt is not at its default value.  This mostly prevents us from
+      // suspending if the user hasn't finished an R statement, since R's prompt changes from > to +
+      // when a statement is incomplete. It is an option since some environments prefer more
+      // aggressive suspension behavior.
+      std::string defaultPrompt = r::options::getOption<std::string>("prompt");
+      if (currentPrompt != defaultPrompt)
+      {
+         return false;
+      }
+   }
+    
+   return true;
 }
    
 
@@ -559,7 +622,8 @@ FilePath tempDir()
    Error error = r::exec::RFunction("tempdir").call(&tempDir);
    if (error)
       LOG_ERROR(error);
-   FilePath filePath(r::util::fixPath(tempDir));
+
+   FilePath filePath(string_utils::systemToUtf8(r::util::fixPath(tempDir)));
    return filePath;
 }
 

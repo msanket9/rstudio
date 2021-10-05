@@ -1,7 +1,7 @@
 /*
  * HtmlUtils.cpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -19,12 +19,15 @@
 
 #include <boost/format.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/bind/bind.hpp>
 
 #include <core/Base64.hpp>
 #include <core/FileSerializer.hpp>
 #include <core/RegexUtils.hpp>
 
 #include <core/http/Util.hpp>
+
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace core {
@@ -71,15 +74,15 @@ std::string Base64ImageFilter::toBase64Image(const boost::cmatch& match)
 
    // see if this is an image within the base directory. if it is then
    // base64 encode it
-   FilePath imagePath = basePath_.childPath(imgRef);
+   FilePath imagePath = basePath_.completeChildPath(imgRef);
    if (imagePath.exists() &&
-       boost::algorithm::starts_with(imagePath.mimeContentType(), "image/"))
+       boost::algorithm::starts_with(imagePath.getMimeContentType(), "image/"))
    {     
       std::string imageBase64;
       Error error = core::base64::encode(imagePath, &imageBase64);
       if (!error)
       {
-         imgRef = "data:" + imagePath.mimeContentType() + ";base64,";
+         imgRef = "data:" + imagePath.getMimeContentType() + ";base64,";
          imgRef.append(imageBase64);
       }
       else
@@ -106,8 +109,8 @@ std::string CssUrlFilter::toBase64Url(const boost::cmatch& match)
 {
    // is this a local file?
    std::string urlRef = match[1];
-   FilePath urlPath = basePath_.childPath(urlRef);
-   std::string ext = urlPath.extensionLowerCase();
+   FilePath urlPath = basePath_.completeChildPath(urlRef);
+   std::string ext = urlPath.getExtensionLowerCase();
    if (urlPath.exists() && (ext == ".ttf" || ext == ".otf"))
    {
       std::string fontBase64;

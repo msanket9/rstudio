@@ -1,7 +1,7 @@
 /*
  * DocumentOutlineWidget.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -14,22 +14,24 @@
  */
 package org.rstudio.studio.client.workbench.views.source;
 
+import com.google.gwt.aria.client.OrientationValue;
+import com.google.gwt.aria.client.Roles;
+import org.rstudio.core.client.ClassIds;
 import org.rstudio.core.client.CommandWithArg;
 import org.rstudio.core.client.Counter;
 import org.rstudio.core.client.HandlerRegistrations;
 import org.rstudio.core.client.StringUtil;
+import org.rstudio.core.client.a11y.A11y;
 import org.rstudio.core.client.dom.DomUtils;
 import org.rstudio.core.client.theme.res.ThemeStyles;
 import org.rstudio.studio.client.RStudioGinjector;
 import org.rstudio.studio.client.common.filetypes.TextFileType;
 import org.rstudio.studio.client.workbench.prefs.model.UserPrefs;
-import org.rstudio.studio.client.workbench.prefs.model.UserPrefUtils;
 import org.rstudio.studio.client.workbench.views.source.editors.text.Scope;
 import org.rstudio.studio.client.workbench.views.source.editors.text.ScopeFunction;
 import org.rstudio.studio.client.workbench.views.source.editors.text.TextEditingTarget;
 import org.rstudio.studio.client.workbench.views.source.editors.text.events.ActiveScopeChangedEvent;
 import org.rstudio.studio.client.workbench.views.source.editors.text.events.CursorChangedEvent;
-import org.rstudio.studio.client.workbench.views.source.editors.text.events.CursorChangedHandler;
 import org.rstudio.studio.client.workbench.views.source.editors.text.events.EditorThemeStyleChangedEvent;
 import org.rstudio.studio.client.workbench.views.source.editors.text.events.ScopeTreeReadyEvent;
 import org.rstudio.studio.client.workbench.views.source.model.SourcePosition;
@@ -58,31 +60,54 @@ import com.google.inject.Inject;
 public class DocumentOutlineWidget extends Composite
                   implements EditorThemeStyleChangedEvent.Handler
 {
-   public class VerticalSeparator extends Composite
+   public static class EmptyPlaceholder extends FlowPanel
+   {
+      public EmptyPlaceholder()
+      {
+         add(new Label("No outline available"));
+         addStyleName(RES.styles().emptyPlaceholder());
+      }
+   }
+
+
+   public static class VerticalSeparator extends Composite
    {
       public VerticalSeparator()
       {
          panel_ = new FlowPanel();
          panel_.addStyleName(RES.styles().leftSeparator());
+         Roles.getSeparatorRole().set(panel_.getElement());
+         Roles.getSeparatorRole().setAriaOrientationProperty(panel_.getElement(),
+               OrientationValue.VERTICAL);
          initWidget(panel_);
       }
-      
+
+      // should be called after the separator is added to a parent
+      public void pad()
+      {
+         // This is a somewhat hacky way of allowing the separator to 'fit'
+         // to a size of 4px, but overflow an extra 4px (to provide extra
+         // space for a mouse cursor to drag or resize)
+         Element parent = getElement().getParentElement();
+         parent.getStyle().setPaddingRight(4, Unit.PX);
+      }
+
       private final FlowPanel panel_;
    }
-   
+
    private class DocumentOutlineTreeEntry extends Composite
    {
       public DocumentOutlineTreeEntry(Scope node, int depth)
       {
          node_ = node;
          FlowPanel panel = new FlowPanel();
-         
+
          setIndent(depth);
          setLabel(node);
-         
+
          panel.add(indent_);
          panel.add(label_);
-         
+
          panel.addDomHandler(new ClickHandler()
          {
             @Override
@@ -90,12 +115,11 @@ public class DocumentOutlineWidget extends Composite
             {
                event.stopPropagation();
                event.preventDefault();
-               
+
                target_.navigateToPosition(
                      SourcePosition.create(node_.getPreamble().getRow(), node_.getPreamble().getColumn()),
                      true);
-               target_.getDocDisplay().alignCursor(node_.getPreamble(), 0.1);
-               
+
                // Defer focus so it occurs after click has been fully handled
                Scheduler.get().scheduleDeferred(new ScheduledCommand()
                {
@@ -107,10 +131,10 @@ public class DocumentOutlineWidget extends Composite
                });
             }
          }, ClickEvent.getType());
-         
+
          initWidget(panel);
       }
-      
+
       private void setLabel(Scope node)
       {
          String text = "";
@@ -138,14 +162,14 @@ public class DocumentOutlineWidget extends Composite
             label_ = new Label(text);
          else
             label_.setText(text);
-         
+
          label_.addStyleName(RES.styles().nodeLabel());
          label_.addStyleName(ThemeStyles.INSTANCE.handCursor());
-         
+
          label_.removeStyleName(RES.styles().nodeLabelChunk());
          label_.removeStyleName(RES.styles().nodeLabelSection());
          label_.removeStyleName(RES.styles().nodeLabelFunction());
-         
+
          if (node.isChunk())
             label_.addStyleName(RES.styles().nodeLabelChunk());
          else if (node.isSection() && !node.isMarkdownHeader() && !node.isYaml())
@@ -153,7 +177,7 @@ public class DocumentOutlineWidget extends Composite
          else if (node.isFunction())
             label_.addStyleName(RES.styles().nodeLabelFunction());
       }
-      
+
       private void setIndent(int depth)
       {
          depth = Math.max(0, depth);
@@ -166,24 +190,24 @@ public class DocumentOutlineWidget extends Composite
          indent_.addStyleName(RES.styles().nodeLabel());
          indent_.getElement().getStyle().setFloat(Style.Float.LEFT);
       }
-      
+
       public void update(Scope node, int depth)
       {
          node_ = node;
          setLabel(node);
          setIndent(depth);
       }
-      
+
       public Scope getScopeNode()
       {
          return node_;
       }
-      
+
       private Scope node_;
       private HTML indent_;
       private Label label_;
    }
-   
+
    private class DocumentOutlineTreeItem extends TreeItem
    {
       public DocumentOutlineTreeItem(DocumentOutlineTreeEntry entry)
@@ -191,68 +215,76 @@ public class DocumentOutlineWidget extends Composite
          super(entry);
          entry_ = entry;
       }
-      
+
       public DocumentOutlineTreeEntry getEntry()
       {
          return entry_;
       }
-      
+
       private final DocumentOutlineTreeEntry entry_;
    }
-   
+
    @Inject
    private void initialize(UserPrefs uiPrefs)
    {
       userPrefs_ = uiPrefs;
    }
-   
+
    public DocumentOutlineWidget(TextEditingTarget target)
    {
       RStudioGinjector.INSTANCE.injectMembers(this);
-      
-      emptyPlaceholder_ = new FlowPanel();
-      emptyPlaceholder_.add(new Label("No outline available"));
-      emptyPlaceholder_.addStyleName(RES.styles().emptyPlaceholder());
-      
+
+      emptyPlaceholder_ = new EmptyPlaceholder();
+
       container_ = new DockLayoutPanel(Unit.PX);
       container_.addStyleName(RES.styles().container());
+      ClassIds.assignClassId(container_, ClassIds.DOC_OUTLINE_CONTAINER);
       target_ = target;
-      
+
       separator_ = new VerticalSeparator();
       container_.addWest(separator_, 4);
-      
-      // This is a somewhat hacky way of allowing the separator to 'fit'
-      // to a size of 4px, but overflow an extra 4px (to provide extra
-      // space for a mouse cursor to drag or resize)
-      Element parent = separator_.getElement().getParentElement();
-      parent.getStyle().setPaddingRight(4, Unit.PX);
-      
+      separator_.pad();
+
       tree_ = new Tree();
       tree_.addStyleName(RES.styles().tree());
-      
+      Roles.getTreeRole().setAriaLabelProperty(tree_.getElement(), "Document Outline");
+
       panel_ = new FlowPanel();
       panel_.addStyleName(RES.styles().panel());
       panel_.add(tree_);
-      
+
       container_.add(panel_);
       handlers_ = new HandlerRegistrations();
       initHandlers();
-          
+
       initWidget(container_);
    }
-   
+
    public Widget getLeftSeparator()
    {
       return separator_;
    }
-   
+
    @Override
    public void onEditorThemeStyleChanged(EditorThemeStyleChangedEvent event)
    {
       updateStyles(container_, event.getStyle());
       updateStyles(emptyPlaceholder_, event.getStyle());
    }
-   
+
+   public void setAriaVisible(boolean visible)
+   {
+      if (visible)
+         A11y.setARIAVisible(getElement());
+      else
+         A11y.setARIAHidden(getElement());
+   }
+
+   public void setTabIndex(int index)
+   {
+      tree_.setTabIndex(index);
+   }
+
    private void initHandlers()
    {
       handlers_.add(target_.getDocDisplay().addScopeTreeReadyHandler(new ScopeTreeReadyEvent.Handler()
@@ -264,7 +296,7 @@ public class DocumentOutlineWidget extends Composite
             resetTreeStyles();
          }
       }));
-      
+
       handlers_.add(target_.getDocDisplay().addActiveScopeChangedHandler(new ActiveScopeChangedEvent.Handler()
       {
          @Override
@@ -275,8 +307,8 @@ public class DocumentOutlineWidget extends Composite
             resetTreeStyles();
          }
       }));
-      
-      handlers_.add(target_.getDocDisplay().addCursorChangedHandler(new CursorChangedHandler()
+
+      handlers_.add(target_.getDocDisplay().addCursorChangedHandler(new CursorChangedEvent.Handler()
       {
          @Override
          public void onCursorChanged(CursorChangedEvent event)
@@ -289,9 +321,9 @@ public class DocumentOutlineWidget extends Composite
             }
          }
       }));
-      
+
       handlers_.add(target_.addEditorThemeStyleChangedHandler(this));
-      
+
       handlers_.add(userPrefs_.docOutlineShow().bind(new CommandWithArg<String>()
       {
          @Override
@@ -300,16 +332,16 @@ public class DocumentOutlineWidget extends Composite
             rebuildScopeTreeOnPrefChange();
          }
       }));
-      
+
    }
-   
+
    private void updateStyles(Widget widget, Style computed)
    {
       Style outlineStyles = widget.getElement().getStyle();
       outlineStyles.setBackgroundColor(computed.getBackgroundColor());
       outlineStyles.setColor(computed.getColor());
    }
-   
+
    private void addOrSetItem(Scope node, int depth, int index)
    {
       int treeSize = tree_.getItemCount();
@@ -317,7 +349,7 @@ public class DocumentOutlineWidget extends Composite
       {
          DocumentOutlineTreeItem item =
             (DocumentOutlineTreeItem) tree_.getItem(index);
-         
+
          item.getEntry().update(node, depth);
       }
       else
@@ -325,35 +357,35 @@ public class DocumentOutlineWidget extends Composite
          tree_.addItem(createEntry(node, depth));
       }
    }
-   
+
    private void setActiveWidget(Widget widget)
    {
       panel_.clear();
       panel_.add(widget);
    }
-   
+
    private void rebuildScopeTreeOnPrefChange()
    {
       if (scopeTree_ == null || currentScope_ == null)
          return;
-      
+
       rebuildScopeTree(scopeTree_, currentScope_);
    }
-   
+
    private void rebuildScopeTree(JsArray<Scope> scopeTree, Scope currentScope)
    {
       scopeTree_ = scopeTree;
       currentScope_ = currentScope;
       currentVisibleScope_ = getCurrentVisibleScope(currentScope_);
-      
+
       if (scopeTree_.length() == 0)
       {
          setActiveWidget(emptyPlaceholder_);
          return;
       }
-      
+
       setActiveWidget(tree_);
-      
+
       int h1Count = 0;
       for (int i = 0; i < scopeTree_.length(); i++)
       {
@@ -364,17 +396,17 @@ public class DocumentOutlineWidget extends Composite
                h1Count++;
          }
       }
-      
+
       int initialDepth = h1Count == 1 ? -1 : 0;
-      
+
       Counter counter = new Counter(-1);
       for (int i = 0; i < scopeTree_.length(); i++)
          buildScopeTreeImpl(scopeTree_.get(i), initialDepth, counter);
-      
-      // Clean up leftovers in the tree. 
+
+      // Clean up leftovers in the tree.
       int oldTreeSize = tree_.getItemCount();
       int newTreeSize = counter.increment();
-      
+
       for (int i = oldTreeSize - 1; i >= newTreeSize; i--)
       {
          TreeItem item = tree_.getItem(i);
@@ -382,78 +414,78 @@ public class DocumentOutlineWidget extends Composite
             item.remove();
       }
    }
-   
+
    private void buildScopeTreeImpl(Scope node, int depth, Counter counter)
    {
       if (shouldDisplayNode(node))
          addOrSetItem(node, depth, counter.increment());
-      
+
       JsArray<Scope> children = node.getChildren();
       for (int i = 0; i < children.length(); i++)
       {
          int newDepth = depth + 1;
-         
+
          // Don't add extra indentation for items within namespaces
          if (node.isNamespace())
             newDepth--;
-         
+
          buildScopeTreeImpl(children.get(i), newDepth, counter);
       }
    }
-   
+
    private boolean isUnnamedNode(Scope node)
    {
       if (node.isChunk())
          return StringUtil.isNullOrEmpty(node.getChunkLabel());
       return StringUtil.isNullOrEmpty(node.getLabel());
    }
-   
+
    private boolean shouldDisplayNode(Scope node)
    {
       String shownSectionsPref = userPrefs_.docOutlineShow().getGlobalValue();
       if (node.isChunk() && shownSectionsPref == UserPrefs.DOC_OUTLINE_SHOW_SECTIONS_ONLY)
          return false;
-      
+
       if (isUnnamedNode(node) && shownSectionsPref != UserPrefs.DOC_OUTLINE_SHOW_ALL)
          return false;
-      
+
       // NOTE: the 'is*' items are not mutually exclusive
       if (node.isAnon() || node.isLambda() || node.isTopLevel())
          return false;
-      
+
       // Don't show namespaces in the scope tree
       if (node.isNamespace())
          return false;
-      
+
       // don't show R functions or R sections in .Rmd unless requested
       TextFileType fileType = target_.getDocDisplay().getFileType();
       if (shownSectionsPref != UserPrefs.DOC_OUTLINE_SHOW_ALL && fileType.isRmd())
       {
          if (node.isFunction())
             return false;
-         
+
          if (node.isSection() && !node.isMarkdownHeader())
             return false;
       }
-      
+
       // filter out anonymous functions
       // TODO: Annotate scope tree in such a way that this isn't necessary
       if (node.getLabel() != null && node.getLabel().startsWith("<function>"))
          return false;
-      
+
       return node.isChunk() ||
              node.isClass() ||
              node.isFunction() ||
              node.isNamespace() ||
              node.isSection();
    }
-   
+
    private void resetTreeStyles()
    {
       for (int i = 0; i < tree_.getItemCount(); i++)
          setTreeItemStyles((DocumentOutlineTreeItem) tree_.getItem(i));
    }
-   
+
    private DocumentOutlineTreeItem createEntry(Scope node, int depth)
    {
       DocumentOutlineTreeEntry entry = new DocumentOutlineTreeEntry(node, depth);
@@ -461,14 +493,14 @@ public class DocumentOutlineWidget extends Composite
       setTreeItemStyles(item);
       return item;
    }
-   
+
    private void setTreeItemStyles(DocumentOutlineTreeItem item)
    {
       Scope node = item.getEntry().getScopeNode();
       item.addStyleName(RES.styles().node());
       DomUtils.toggleClass(item.getElement(), RES.styles().activeNode(), isActiveNode(node));
    }
-   
+
    private Scope getCurrentVisibleScope(Scope node)
    {
       for (; node != null && !node.isTopLevel(); node = node.getParentScope())
@@ -476,58 +508,58 @@ public class DocumentOutlineWidget extends Composite
             return node;
       return null;
    }
-   
+
    private boolean isActiveNode(Scope node)
    {
       return node != null && currentVisibleScope_ != null && node.equals(currentVisibleScope_);
    }
-   
+
    private final DockLayoutPanel container_;
    private final FlowPanel panel_;
    private final VerticalSeparator separator_;
    private final Tree tree_;
-   private final FlowPanel emptyPlaceholder_;
-   
+   private final EmptyPlaceholder emptyPlaceholder_;
+
    private final TextEditingTarget target_;
    private final HandlerRegistrations handlers_;
-   
+
    private JsArray<Scope> scopeTree_;
    private Scope currentScope_;
    private Scope currentVisibleScope_;
-   
+
    private UserPrefs userPrefs_;
-   
+
    // Styles, Resources etc. ----
    public interface Styles extends CssResource
    {
       String panel();
       String container();
-      
+
       String leftSeparator();
       String emptyPlaceholder();
-      
+
       String tree();
-      
+
       String node();
-      
+
       String activeNode();
       String activeParentNode();
-      
+
       String nodeLabel();
       String nodeLabelChunk();
       String nodeLabelSection();
       String nodeLabelFunction();
    }
-   
+
    public interface Resources extends ClientBundle
    {
       @Source("DocumentOutlineWidget.css")
       Styles styles();
    }
-   
-   private static Resources RES = GWT.create(Resources.class);
+
+   public static Resources RES = GWT.create(Resources.class);
    static {
       RES.styles().ensureInjected();
    }
-   
+
 }

@@ -1,7 +1,7 @@
 /*
  * Preferences.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -23,6 +23,16 @@ using namespace rstudio::core;
 namespace rstudio {
 namespace session {
 namespace prefs {
+
+Preferences::Preferences():
+   initialized_(false)
+{
+}
+
+bool Preferences::initialized()
+{
+   return initialized_;
+}
 
 core::json::Array Preferences::allLayers()
 {
@@ -73,11 +83,6 @@ Error Preferences::initialize()
    {
       for (auto layer: layers_)
       {
-         // Validate the layer and log errors for violations
-         error = layer->validatePrefs();
-         if (error)
-            LOG_ERROR(error);
-
          // Subscribe for layer change notifications
          layer->onChanged.connect(boost::bind(&Preferences::onPrefLayerChanged, this,
                   layer->layerName(), _1));
@@ -85,15 +90,31 @@ Error Preferences::initialize()
    }
    END_LOCK_MUTEX
 
+   // Indicate that we've loaded all layers
+   initialized_ = true;
+
    return Success();
+}
+
+void Preferences::destroyLayers()
+{
+   RECURSIVE_LOCK_MUTEX(mutex_)
+   {
+      // Give each layer a chance to destroy itself
+      for (auto layer: layers_)
+      {
+         layer->destroy();
+      }
+   }
+   END_LOCK_MUTEX
 }
 
 core::Error Preferences::writeLayer(int layer, const core::json::Object& prefs)
 {
    Error result;
 
-   // A vector of all the preferences actually changed in this update
-   std::vector<std::string> changed;
+   // A set of all the preferences actually changed in this update
+   std::set<std::string> changed;
 
    RECURSIVE_LOCK_MUTEX(mutex_)
    {
@@ -102,7 +123,7 @@ core::Error Preferences::writeLayer(int layer, const core::json::Object& prefs)
          return systemError(boost::system::errc::invalid_argument, ERROR_LOCATION);
 
       // Write only the unique values in this layer.
-      json::Object unique;
+      json::Object newPrefs;
       for (const auto pref: prefs)
       {
          // Check to see whether the value for this preference (a) exists in some other lower layer,
@@ -111,17 +132,17 @@ core::Error Preferences::writeLayer(int layer, const core::json::Object& prefs)
          bool differs = false;
          for (int i = layer; i >= 0; --i)
          {
-            const auto val = layers_[i]->readValue(pref.name());
+            const auto val = layers_[i]->readValue(pref.getName());
             if (val)
             {
                found = true;
-               if (!(*val == pref.value()))
+               if (!(*val == pref.getValue()))
                {
                   if (layer == i)
                   {
                      // The pref exists in this layer and has a different value; emit a changed
                      // notification for it later.
-                     changed.push_back(pref.name());
+                     changed.insert(pref.getName());
                   }
                   else
                   {
@@ -141,16 +162,35 @@ core::Error Preferences::writeLayer(int layer, const core::json::Object& prefs)
          {
             // If the preference doesn't exist in any other layer, or the value doesn't match the
             // value found elsewhere, record the unique value in this layer.
-            unique[pref.name()] = pref.value();
+            newPrefs[pref.getName()] = pref.getValue();
          }
       }
 
-      result = layers_[layer]->writePrefs(unique);
+      // We emitted change notifications for values that changed; now we need to emit them for
+      // added/removed values.
+      auto oldPrefs = layers_[layer]->allPrefs();
+
+      // Find prefs we removed (in the old set but not the new set)
+      for (const auto pref: oldPrefs)
+      {
+         if (newPrefs.find(pref.getName()) == newPrefs.end())
+            changed.insert(pref.getName());
+      }
+
+      // Find prefs we added (in the new set but not the old set)
+      for (const auto pref: newPrefs)
+      {
+         if (oldPrefs.find(pref.getName()) == oldPrefs.end())
+            changed.insert(pref.getName());
+      }
+
+      // Commit new prefs
+      result = layers_[layer]->writePrefs(newPrefs);
    }
    END_LOCK_MUTEX;
 
    // Emit change events for all the preferences we changed
-   for (const auto prefName: changed)
+   for (const auto& prefName: changed)
    {
       onChanged(layers_[layer]->layerName(), prefName);
    }
@@ -168,7 +208,7 @@ boost::optional<core::json::Value> Preferences::readValue(const std::string& nam
    // settings) and working towards the most general (basic defaults)
    RECURSIVE_LOCK_MUTEX(mutex_)
    {
-      for (const auto layer: boost::adaptors::reverse(layers_))
+      for (const auto& layer: boost::adaptors::reverse(layers_))
       {
          boost::optional<core::json::Value> val = layer->readValue(name);
          if (val)
@@ -191,7 +231,7 @@ boost::optional<core::json::Value> Preferences::readValue(const std::string& lay
 {
    RECURSIVE_LOCK_MUTEX(mutex_)
    {
-      for (const auto layer: layers_)
+      for (const auto& layer: layers_)
       {
          if (layer->layerName() == layerName)
          {
@@ -291,6 +331,12 @@ void Preferences::onPrefLayerChanged(const std::string& layerName, const std::st
 
 void Preferences::notifyClient(const std::string &layerName, const std::string &pref)
 {
+   // No work to do unless there's a client event to emit
+   int eventId = clientChangedEvent();
+   if (eventId < 1)
+      return;
+
+   // Loop through layers to find pref at named layer
    bool found = false;
    RECURSIVE_LOCK_MUTEX(mutex_)
    {
@@ -307,7 +353,7 @@ void Preferences::notifyClient(const std::string &layerName, const std::string &
                json::Object dataJson;
                dataJson["name"] = layerName;
                dataJson["values"] = valueJson;
-               ClientEvent event(clientChangedEvent(), dataJson);
+               ClientEvent event(eventId, dataJson);
                module_context::enqueClientEvent(event);
 
                found = true;

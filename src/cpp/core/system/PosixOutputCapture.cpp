@@ -1,7 +1,7 @@
 /*
  * PosixOutputCapture.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -22,11 +22,16 @@
 #include <iostream>
 
 #include <core/Log.hpp>
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
+#include <shared_core/SafeConvert.hpp>
 #include <core/BoostThread.hpp>
 #include <core/BoostErrors.hpp>
 
 #include <core/system/System.hpp>
+
+#include <boost/bind/bind.hpp>
+
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace core {
@@ -38,7 +43,7 @@ void readFromPipe(
       int pipeFd,
       const boost::function<void(const std::string&)>& outputFunction)
 {
-   const int kBufferSize = 512;
+   const int kBufferSize = 40960;
    char buffer[kBufferSize];
    int bytesRead = 0;
    while ( (bytesRead = ::read(pipeFd, buffer, kBufferSize)) > 0 )
@@ -69,21 +74,46 @@ void standardStreamCaptureThread(
    auto wrapHandler =
     [=](const boost::function<void(const std::string&)>& handler,
         int dupFd,
+        const std::string& descriptorType,
+        boost::shared_ptr<bool> pSkipWrite,
         const std::string& output)
     {
        handler(output);
-       if (::write(dupFd, output.c_str(), output.size()) == -1)
+
+       if (!*pSkipWrite)
        {
-          if (errno != EAGAIN && errno != EINTR)
-             LOG_ERROR(systemError(errno, ERROR_LOCATION));
+          if (::write(dupFd, output.c_str(), output.size()) == -1)
+          {
+             if (errno == EPIPE || errno == EBADF)
+             {
+                // the std stream was closed somehow, meaning this write call will never succeed again
+                // mark that we should skip the write, and only log this error once
+                *pSkipWrite = true;
+
+                std::string cause = errno == EBADF ? " closed" : "'s pipe read end closed";
+                std::string description =
+                      descriptorType + " descriptor " + core::safe_convert::numberToString(dupFd) +
+                      cause + ". Output will no longer be redirected.";
+
+                LOG_ERROR(systemError(errno, description, ERROR_LOCATION));
+             }
+             else if (errno != EAGAIN && errno != EINTR)
+                LOG_ERROR(systemError(errno, ERROR_LOCATION));
+          }
        }
     };
 
    if (dupStdoutFd != -1)
-      outHandler = boost::bind<void>(wrapHandler, stdoutHandler, dupStdoutFd, _1);
+   {
+      boost::shared_ptr<bool> pSkipStdoutWrite = boost::make_shared<bool>(false);
+      outHandler = boost::bind<void>(wrapHandler, stdoutHandler, dupStdoutFd, "Stdout", pSkipStdoutWrite, _1);
+   }
 
    if (dupStderrFd != -1)
-      errHandler = boost::bind<void>(wrapHandler, stderrHandler, dupStderrFd, _1);
+   {
+      boost::shared_ptr<bool> pSkipStderrWrite = boost::make_shared<bool>(false);
+      errHandler = boost::bind<void>(wrapHandler, stderrHandler, dupStderrFd, "Stderr", pSkipStderrWrite, _1);
+   }
 
    try
    {

@@ -1,7 +1,7 @@
 /*
  * SessionConsoleProcessInfo.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -28,6 +28,7 @@
 #include <session/SessionModuleContext.hpp>
 #include <session/SessionPersistentState.hpp>
 #include <session/SessionOptions.hpp>
+#include <session/prefs/UserPrefs.hpp>
 
 using namespace rstudio::core;
 
@@ -207,7 +208,7 @@ core::json::Object ConsoleProcessInfo::toJson(SerializationMode serialMode) cons
    result["allow_restart"] = allowRestart_;
    result["title"] = title_;
    result["child_procs"] = childProcs_;
-   result["shell_type"] = TerminalShell::getShellId(shellType_); 
+   result["shell_type"] = TerminalShell::getShellId(shellType_);
    result["channel_mode"] = static_cast<int>(channelMode_);
    result["channel_id"] = channelId_;
    result["alt_buffer"] = altBufferActive_;
@@ -372,6 +373,17 @@ void ConsoleProcessInfo::saveConsoleEnvironment(const core::system::Options& env
 void ConsoleProcessInfo::loadConsoleEnvironment(const std::string& handle, core::system::Options* pEnv)
 {
    console_persist::loadConsoleEnvironment(handle, pEnv);
+}
+
+AutoCloseMode ConsoleProcessInfo::closeModeFromPref(std::string prefValue)
+{
+   if (prefValue == kTerminalCloseBehaviorAlways)
+      return AlwaysAutoClose;
+   if (prefValue == kTerminalCloseBehaviorClean)
+      return CleanExitAutoClose;
+   if (prefValue == kTerminalCloseBehaviorNever)
+      return NeverAutoClose;
+   return NeverAutoClose;
 }
 
 } // namespace console_process_info

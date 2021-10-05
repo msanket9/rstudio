@@ -1,7 +1,7 @@
 /*
  * RmdOutputPresenter.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -55,6 +55,7 @@ public class RmdOutputPresenter implements
       int getScrollPosition();
       void refresh();
       String getTitle();
+      String getName();
       String getAnchor();
       void focusFind();
    }
@@ -120,7 +121,7 @@ public class RmdOutputPresenter implements
    {
       return DomUtils.makeAbsoluteUrl(params_.getOutputUrl());
    }
-
+   
    @Override
    public void onShinyDisconnect()
    {

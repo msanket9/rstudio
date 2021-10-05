@@ -1,7 +1,7 @@
 /*
  * SessionHistory.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -22,16 +22,16 @@
 #include <gsl/gsl>
 
 #include <boost/utility.hpp>
-#include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/format.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/bind/bind.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Exec.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 #include <core/DateTime.hpp>
 
 #include <core/json/JsonRpc.hpp>
@@ -45,6 +45,7 @@
 #include "SessionHistoryArchive.hpp"
 
 using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace session {
@@ -207,12 +208,12 @@ Error removeHistoryItems(const json::JsonRpcRequest& request,
    // convert to top indexes
    int historySize = r::session::consoleHistory().size();
    std::vector<int> indexes;
-   for (std::size_t i=0; i<bottomIndexesJson.size(); i++)
+   for (std::size_t i=0; i<bottomIndexesJson.getSize(); i++)
    {  
       const json::Value& value = bottomIndexesJson[i];
       if (json::isType<int>(value))
       {
-         int bottomIndex = value.get_int();
+         int bottomIndex = value.getInt();
          int topIndex = historySize - 1 - bottomIndex;
          indexes.push_back(topIndex);
       }
@@ -433,7 +434,7 @@ Error initialize()
    // install handlers
    using boost::bind;
    using namespace session::module_context;
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(registerRpcMethod, "get_recent_history", getRecentHistory))
       (bind(registerRpcMethod, "get_history_items", getHistoryItems))

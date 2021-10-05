@@ -1,7 +1,7 @@
 /*
  * UserPrefs.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -27,7 +27,7 @@
 
 #include "UserPrefValuesNative.hpp"
 
-#include <core/json/Json.hpp>
+#include <shared_core/json/Json.hpp>
 
 namespace rstudio {
    namespace core {
@@ -59,6 +59,8 @@ core::json::Array allPrefLayers();
 core::Error initializePrefs();
 
 core::Error initializeSessionPrefs();
+
+core::Error initializeProjectPrefs();
 
 } // namespace prefs
 } // namespace session

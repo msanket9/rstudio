@@ -1,7 +1,7 @@
 /*
  * SessionWorkbench.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -21,7 +21,7 @@
 #include <boost/format.hpp>
 
 #include <core/CrashHandler.hpp>
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Debug.hpp>
 #include <core/Exec.hpp>
 #include <core/StringUtils.hpp>
@@ -121,15 +121,15 @@ SEXP rs_getEditorContext(SEXP typeSEXP)
    
    // add in the selection ranges
    ListBuilder selectionBuilder(&protect);
-   for (std::size_t i = 0; i < selection.size(); ++i)
+   for (std::size_t i = 0; i < selection.getSize(); ++i)
    {
-      const json::Object& object = selection[i].get_obj();
+      const json::Object& object = selection[i].getObject();
       
       json::Array rangeJson;
       std::string text;
       Error error = json::readObject(object,
-                                     "range", &rangeJson,
-                                     "text", &text);
+                                     "range", rangeJson,
+                                     "text", text);
       if (error)
       {
          LOG_ERROR(error);
@@ -137,7 +137,7 @@ SEXP rs_getEditorContext(SEXP typeSEXP)
       }
       
       std::vector<int> range;
-      if (!json::fillVectorInt(rangeJson, &range))
+      if (!rangeJson.toVectorInt(range))
       {
          LOG_WARNING_MESSAGE("failed to parse document range");
          continue;
@@ -172,7 +172,7 @@ Error setClientState(const json::JsonRpcRequest& request,
                                   &persistentState,
                                   &projPersistentState);
    if (error)
-      return error ;
+      return error;
    
    // set state
    r::session::ClientState& clientState = r::session::clientState();
@@ -190,7 +190,7 @@ Error setWorkbenchMetrics(const json::JsonRpcRequest& request,
                           json::JsonRpcResponse* /*pResponse*/)
 {
    // extract fields
-   r::session::RClientMetrics metrics ;
+   r::session::RClientMetrics metrics;
    Error error = json::readObjectParam(request.params, 0,
                                  "consoleWidth", &(metrics.consoleWidth),
                                  "buildConsoleWidth", &(metrics.buildConsoleWidth),
@@ -215,54 +215,7 @@ Error adaptToLanguage(const json::JsonRpcRequest& request,
    if (error)
       return error;
    
-   // check to see what language is active in main console
-   using namespace r::exec;
-   
-   // check to see what language is currently active (but default to r)
-   std::string activeLanguage = "R";
-   if (reticulate::isReplActive())
-      activeLanguage = "Python";
-   
-   // now, detect if we are transitioning languages
-   if (language != activeLanguage)
-   {
-      // since it may take some time for the console input to be processed,
-      // we screen out consecutive transition attempts (otherwise we can
-      // get multiple interleaved attempts to launch the REPL with console
-      // input)
-      static RSTUDIO_BOOST_CONNECTION conn;
-      if (conn.connected())
-         return Success();
-      
-      // establish the connection, and then simply disconnect once we
-      // receive the signal
-      conn = module_context::events().onConsolePrompt.connect([&](const std::string&) {
-         conn.disconnect();
-      });
-      
-      if (activeLanguage == "R")
-      {
-         if (language == "Python")
-         {
-            // r -> python: activate the reticulate REPL
-            Error error =
-                  module_context::enqueueConsoleInput("reticulate::repl_python()");
-            if (error)
-               LOG_ERROR(error);
-         }
-      }
-      else if (activeLanguage == "Python")
-      {
-         if (language == "R")
-         {
-            // python -> r: deactivate the reticulate REPL
-            Error error =
-                  module_context::enqueueConsoleInput("quit");
-         }
-      }
-   }
-   
-   return Success();
+   return module_context::adaptToLanguage(language);
 }
 
 Error executeCode(const json::JsonRpcRequest& request,
@@ -310,11 +263,11 @@ Error createSshKey(const json::JsonRpcRequest& request,
 
    // resolve key path
    FilePath sshKeyPath = module_context::resolveAliasedPath(path);
-   error = sshKeyPath.parent().ensureDirectory();
+   error = sshKeyPath.getParent().ensureDirectory();
    if (error)
       return error;
-   FilePath sshPublicKeyPath = sshKeyPath.parent().complete(
-                                             sshKeyPath.stem() + ".pub");
+   FilePath sshPublicKeyPath = sshKeyPath.getParent().completePath(
+                                             sshKeyPath.getStem() + ".pub");
    if (sshKeyPath.exists() || sshPublicKeyPath.exists())
    {
       if (!overwrite)
@@ -369,7 +322,7 @@ Error createSshKey(const json::JsonRpcRequest& request,
 
    // add msys_ssh to path
    core::system::addToPath(&childEnv,
-                           session::options().msysSshPath().absolutePath());
+                           session::options().msysSshPath().getAbsolutePath());
 
    options.environment = childEnv;
 #endif
@@ -418,11 +371,11 @@ void editFilePostback(const std::string& file,
    ClientEvent editEvent = session::showEditorEvent(fileContents, false, true);
 
    // wait for edit_completed
-   json::JsonRpcRequest request ;
+   json::JsonRpcRequest request;
    bool succeeded = s_waitForEditCompleted(&request, editEvent);
 
    // cancelled or otherwise didn't succeed
-   if (!succeeded || request.params[0].is_null())
+   if (!succeeded || request.params[0].isNull())
    {
       cont(EXIT_FAILURE, "");
       return;
@@ -464,14 +417,16 @@ void handleFileShow(const http::Request& request, http::Response* pResponse)
 {
    // get the file path
    FilePath filePath = module_context::resolveAliasedPath(request.queryParamValue("path"));
-   if (!filePath.exists())
+
+   // treat disallowed paths identically to missing ones so this endpoint cannot be used to probe
+   // for existence
+   if (!filePath.exists() || !module_context::isPathViewAllowed(filePath))
    {
       pResponse->setNotFoundError(request);
       return;
    }
 
    // send it back
-   pResponse->setCacheWithRevalidationHeaders();
    pResponse->setCacheableFile(filePath, request);
 }
 
@@ -485,10 +440,6 @@ void onUserSettingsChanged(const std::string& layer, const std::string& pref)
 
    if (pref == kCranMirror)
    {
-      Error error = prefs::userState().setCranMirrorChanged(true);
-      if (error)
-         LOG_ERROR(error);
-
       // verify cran mirror security (will either update to https or
       // will print a warning)
       module_context::reconcileSecureDownloadConfiguration();
@@ -532,17 +483,17 @@ Error initialize()
    // register postback handler for viewPDF (server-only)
    if (session::options().programMode() == kSessionProgramModeServer)
    {
-      std::string pdfShellCommand ;
+      std::string pdfShellCommand;
       Error error = module_context::registerPostbackHandler("pdfviewer",
                                                             viewPdfPostback,
                                                             &pdfShellCommand);
       if (error)
-         return error ;
+         return error;
 
       // set pdfviewer option
       error = r::options::setOption("pdfviewer", pdfShellCommand);
       if (error)
-         return error ;
+         return error;
 
 
       // register editfile handler and save its path
@@ -566,7 +517,7 @@ Error initialize()
    // complete initialization
    using boost::bind;
    using namespace module_context;
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (bind(registerUriHandler, "/file_show", handleFileShow))
       (bind(registerRpcMethod, "set_client_state", setClientState))

@@ -1,7 +1,7 @@
 /*
  * UserPrefsLayer.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -35,7 +35,7 @@ UserPrefsLayer::UserPrefsLayer():
 Error UserPrefsLayer::readPrefs()
 {
    Error err;
-   prefsFile_ = core::system::xdg::userConfigDir().complete(kUserPrefsFile);
+   prefsFile_ = core::system::xdg::userConfigDir().completePath(kUserPrefsFile);
 
    // After deferred init, start monitoring the prefs file for changes
    module_context::events().onDeferredInit.connect([&](bool)
@@ -44,24 +44,27 @@ Error UserPrefsLayer::readPrefs()
    });
 
    // Mark the last sync time 
-   lastSync_ = prefsFile_.lastWriteTime();
+   lastSync_ = prefsFile_.getLastWriteTime();
 
-   return loadPrefsFromFile(prefsFile_);
+   return loadPrefsFromFile(prefsFile_,
+       options().rResourcesPath().completePath("schema").completePath(kUserPrefsSchemaFile));
 }
 
 void UserPrefsLayer::onPrefsFileChanged()
 {
-   if (prefsFile_.lastWriteTime() <= lastSync_)
+   if (prefsFile_.getLastWriteTime() <= lastSync_)
    {
       // No work to do; we wrote this update ourselves.
       return;
    }
 
    // Make a copy of the prefs prior to reloading, so we can diff against the old copy
-   const json::Object old = cache_->clone().get_obj();
+   const json::Value oldVal = cache_->clone();
+   const json::Object old = oldVal.getObject();
 
    // Reload the prefs from the file
-   Error error = loadPrefsFromFile(prefsFile_);
+   Error error = loadPrefsFromFile(prefsFile_,
+       options().rResourcesPath().completePath("schema").completePath(kUserPrefsSchemaFile));
    if (error)
    {
       LOG_ERROR(error);
@@ -69,7 +72,7 @@ void UserPrefsLayer::onPrefsFileChanged()
    }
 
    // Figure out what prefs changed in the file
-   for (const auto key: UserPrefValues::allKeys())
+   for (const auto& key: UserPrefValues::allKeys())
    {
       const auto itOld = old.find(key);
       const auto itNew = cache_->find(key);
@@ -78,7 +81,7 @@ void UserPrefsLayer::onPrefsFileChanged()
       // didn't exist in the old set, or existed there with a new value. This does not currently
       // emit events for pref values that have been removed.
       if (itNew != cache_->end() &&
-          (itOld == old.end() || !((*itNew).value() == (*itOld).value())))
+          (itOld == old.end() || !((*itNew).getValue() == (*itOld).getValue())))
       {
          onChanged(key);
       }
@@ -87,7 +90,7 @@ void UserPrefsLayer::onPrefsFileChanged()
 
 Error UserPrefsLayer::writePrefs(const core::json::Object &prefs)
 {
-   if (prefsFile_.empty())
+   if (prefsFile_.isEmpty())
    {
       return fileNotFoundError(ERROR_LOCATION);
    }
@@ -103,16 +106,24 @@ Error UserPrefsLayer::writePrefs(const core::json::Object &prefs)
    if (!error)
    {
       // If we successfully wrote the contents, mark the last sync time
-      lastSync_ = prefsFile_.lastWriteTime();
+      lastSync_ = prefsFile_.getLastWriteTime();
+   }
+
+   // Modify the error to be more descriptive
+   if (isFileNotFoundError(error) && prefsFile_.exists())
+   {
+      error = Error(
+         error.getName(),
+         error.getCode(),
+         "Unable to save preferences. Please verify that " + 
+            prefsFile_.getAbsolutePath() +
+            " exists and is owned by the user '" +
+            system::username() + "'.",
+         error,
+         ERROR_LOCATION);
    }
 
    return error;
-}
-
-Error UserPrefsLayer::validatePrefs()
-{
-   return validatePrefsFromSchema(
-      options().rResourcesPath().complete("schema").complete(kUserPrefsSchemaFile));
 }
 
 } // namespace prefs

@@ -1,7 +1,7 @@
 /*
  * UserPrefs.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,7 +16,7 @@
 #include <core/system/Xdg.hpp>
 #include <core/FileSerializer.hpp>
 #include <core/json/JsonRpc.hpp>
-#include <core/json/rapidjson/schema.h>
+#include <shared_core/json/rapidjson/schema.h>
 
 #include <core/Exec.hpp>
 
@@ -83,10 +83,10 @@ class UserPrefs: public UserPrefValuesNative
 
 public:
 
-   Error createComputedLayers()
+   Error createComputedLayer()
    {
-      // The computed layers is created later since computations may involve evaluating R code
-      // (which we can't do in early init) or projects 
+      // The computed layer is created later since computations may involve evaluating R code
+      // (which we can't do in early init)
       RECURSIVE_LOCK_MUTEX(mutex_)
       {
          auto computed = boost::make_shared<UserPrefsComputedLayer>();
@@ -96,18 +96,28 @@ public:
 
          layers_.insert(layers_.begin() + PREF_LAYER_COMPUTED, computed);
 
-         auto project = boost::make_shared<UserPrefsProjectLayer>();
-         error = project->readPrefs();
-         if (error)
-            return error;
-
-         layers_.push_back(project);
       }
       END_LOCK_MUTEX
 
       return Success();
    }
 
+   Error createProjectLayer()
+   {
+      RECURSIVE_LOCK_MUTEX(mutex_)
+      {
+         auto project = boost::make_shared<UserPrefsProjectLayer>();
+         Error error = project->readPrefs();
+         if (error)
+            return error;
+
+         layers_.push_back(project);
+
+      }
+      END_LOCK_MUTEX
+
+      return Success();
+   }
 };
 
 } // anonymous namespace
@@ -137,7 +147,13 @@ Error initializePrefs()
 Error initializeSessionPrefs()
 {
    UserPrefs& instance = static_cast<UserPrefs&>(userPrefs());
-   return instance.createComputedLayers();
+   return instance.createComputedLayer();
+}
+
+Error initializeProjectPrefs()
+{
+   UserPrefs& instance = static_cast<UserPrefs&>(userPrefs());
+   return instance.createProjectLayer();
 }
 
 } // namespace prefs

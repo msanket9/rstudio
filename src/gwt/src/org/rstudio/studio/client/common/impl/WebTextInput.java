@@ -1,7 +1,7 @@
 /*
  * WebTextInput.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -69,7 +69,7 @@ public class WebTextInput implements TextInput
       // This variable introduces a level of pointer indirection that lets us
       // get around passing TextEntryModalDialog a reference to itself in its
       // own constructor.
-      final Value<TextEntryModalDialog> pDialog = new Value<TextEntryModalDialog>(null);
+      final Value<TextEntryModalDialog> pDialog = new Value<>(null);
 
       final TextEntryModalDialog dialog = new TextEntryModalDialog(
             title,
@@ -106,7 +106,7 @@ public class WebTextInput implements TextInput
                      int left = (Window.getClientWidth()/2) - (offsetWidth/2);
                      int top = (Window.getClientHeight()/2) - (offsetHeight/2);
                      
-                     if (type == MessageDisplay.INPUT_PASSWORD)
+                     if (type == MessageDisplay.INPUT_USERNAME || type == MessageDisplay.INPUT_PASSWORD)
                         top = 50;
                      
                      setPopupPosition(left, top);

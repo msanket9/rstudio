@@ -1,7 +1,7 @@
 /*
  * REmbeddedWin32.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,21 +17,26 @@
 #undef TRUE
 #undef FALSE
 
+#include <Rversion.h>
+
 #define R_INTERNAL_FUNCTIONS
+#include <Rversion.h>
 #include <r/RInternal.hpp>
+#include <r/RVersionInfo.hpp>
 
 #define Win32
 #include "REmbedded.hpp"
 
 #include <stdio.h>
 
-#include <boost/bind.hpp>
 #include <boost/format.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 #include <core/Exec.hpp>
 #include <core/StringUtils.hpp>
+#include <core/system/LibraryLoader.hpp>
 
 #include <r/RInterface.hpp>
 #include <r/RFunctionHook.hpp>
@@ -44,12 +49,14 @@
 
 extern "C" void R_ProcessEvents(void);
 extern "C" void R_CleanUp(SA_TYPE, int, int);
+extern "C" void cmdlineoptions(int, char**);
 
 extern "C" {
    __declspec(dllimport) UImode CharacterMode;
 }
 
 using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace r {
@@ -100,42 +107,75 @@ int askYesNoCancel(const char* question)
    }
 }
 
-void setMemoryLimit()
+bool initializeMaxMemoryDangerously()
 {
-   // set defaults for R_max_memory. this code is based on similar code
-   // in cmdlineoptions in system.c (but calls memory.limit directly rather
-   // than setting R_max_memory directly, which we can't do because it
-   // isn't exported from the R.dll
+   Error error;
 
-   // some constants
-   const DWORDLONG MB_TO_BYTES = 1024 * 1024;
-   const DWORDLONG VIRTUAL_OFFSET = 512 * MB_TO_BYTES;
-
-   // interograte physical and virtual memory
-   MEMORYSTATUSEX memoryStatus;
-   memoryStatus.dwLength = sizeof(memoryStatus);
-   ::GlobalMemoryStatusEx(&memoryStatus);
-   DWORDLONG virtualMemory = memoryStatus.ullTotalVirtual - VIRTUAL_OFFSET;
-   DWORDLONG physicalMem = memoryStatus.ullTotalPhys;
-
-   // use physical memory on win64. on win32 further constrain by
-   // virtual memory minus an offset (for the os and other programs)
- #ifdef _WIN64
-   DWORDLONG maxMemory = physicalMem;
- #else
-   DWORDLONG maxMemory = std::min(virtualMemory, physicalMem);
- #endif
-
-   // call the memory.limit function
-   maxMemory = maxMemory / MB_TO_BYTES;
-   r::exec::RFunction memoryLimit(".rs.setMemoryLimit");
-   memoryLimit.addParam((double)maxMemory);
-   Error error = memoryLimit.call();
+   void* pLibrary = nullptr;
+   error = core::system::loadLibrary("R.dll", &pLibrary);
    if (error)
-      LOG_ERROR(error);
+      return false;
+
+   // first, see if we can load the 'R_max_memory' symbol directly
+   size_t* p_R_max_memory = nullptr;
+   error = core::system::loadSymbol(
+            pLibrary,
+            "R_max_memory",
+            (void**) &p_R_max_memory);
+
+   if (error)
+   {
+      // terrible, terrible hack -- for typical builds of R from CRAN,
+      // the memory address for R_max_memory lies just before the
+      // Rwin_graphicsx symbol, so find that symbol, and compute the
+      // position of R_max_memory offset from that
+      char* p_Rwin_graphicsx = nullptr;
+      error = core::system::loadSymbol(
+               pLibrary,
+               "Rwin_graphicsx",
+               (void**) &p_Rwin_graphicsx);
+
+      if (error)
+         return false;
+
+      // get memory address for R_max_memory
+      p_R_max_memory = (size_t*) (p_Rwin_graphicsx - sizeof(size_t));
+   }
+
+   // newer versions of R initialize R_max_memory to SIZE_MAX, while
+   // older versions use INT_MAX. allow either value here when checking
+   bool ok =
+         *p_R_max_memory == SIZE_MAX ||
+         *p_R_max_memory == INT_MAX;
+
+   if (!ok)
+      return false;
+
+   // we found the memory address! let's fill it up
+   MEMORYSTATUSEX status;
+   status.dwLength = sizeof(status);
+   ::GlobalMemoryStatusEx(&status);
+   *p_R_max_memory = status.ullTotalPhys;
+
+   return true;
 }
 
+bool initializeMaxMemoryViaCmdLineOptions()
+{
+   static const int rargc = 2;
+   static const char* rargv[] = {"R.exe", "--vanilla"};
+   ::cmdlineoptions(rargc, (char**) rargv);
+
+   return true;
 }
+
+void initializeMaxMemory(const core::FilePath& rHome)
+{
+   initializeMaxMemoryDangerously() ||
+         initializeMaxMemoryViaCmdLineOptions();
+}
+
+} // end anonymous namespace
 
 void runEmbeddedR(const core::FilePath& rHome,
                   const core::FilePath& userHome,
@@ -148,8 +188,8 @@ void runEmbeddedR(const core::FilePath& rHome,
    // no signal handlers (see comment in REmbeddedPosix.cpp for rationale)
    R_SignalHandlers = 0;
 
-   // set start time
-   ::R_setStartTime();
+   // initialize R_max_memory
+   initializeMaxMemory(rHome);
 
    // setup params structure
    structRstart rp;
@@ -158,15 +198,19 @@ void runEmbeddedR(const core::FilePath& rHome,
 
    // set paths (copy to new string so we can provide char*)
    std::string* pRHome = new std::string(
-            core::string_utils::utf8ToSystem(rHome.absolutePath()));
+            core::string_utils::utf8ToSystem(rHome.getAbsolutePath()));
    std::string* pUserHome = new std::string(
-            core::string_utils::utf8ToSystem(userHome.absolutePath()));
+            core::string_utils::utf8ToSystem(userHome.getAbsolutePath()));
    pRP->rhome = const_cast<char*>(pRHome->c_str());
    pRP->home = const_cast<char*>(pUserHome->c_str());
 
    // more configuration
    pRP->CharacterMode = RGui;
+#if R_VERSION < R_Version(4, 0, 0)
    pRP->R_Slave = FALSE;
+#else
+   pRP->R_NoEcho = FALSE;
+#endif
    pRP->R_Quiet = quiet ? TRUE : FALSE;
    pRP->R_Interactive = TRUE;
    pRP->SaveAction = defaultSaveAction;
@@ -187,9 +231,9 @@ void runEmbeddedR(const core::FilePath& rHome,
    pInternal->suicide = R_Suicide;
 
    // set command line
-   const char *args[]= {"RStudio", "--interactive"};
-   int argc = sizeof(args)/sizeof(args[0]);
-   ::R_set_command_line_arguments(argc, (char**)args);
+   const char *argv[] = {"RStudio", "--interactive"};
+   int argc = sizeof(argv) / sizeof(argv[0]);
+   ::R_set_command_line_arguments(argc, const_cast<char**>(argv));
 
    // set params
    ::R_SetParams(pRP);
@@ -222,9 +266,6 @@ void runEmbeddedR(const core::FilePath& rHome,
 
 Error completeEmbeddedRInitialization(bool useInternet2)
 {
-   // set memory limit
-   setMemoryLimit();
-
    // use IE proxy settings if requested
    if (!r::session::utils::isR3_3())
    {
@@ -240,8 +281,8 @@ Error completeEmbeddedRInitialization(bool useInternet2)
       LOG_ERROR(error);
 
    using boost::bind;
-   using namespace r::function_hook ;
-   ExecBlock block ;
+   using namespace r::function_hook;
+   ExecBlock block;
    block.addFunctions()
       (bind(registerUnsupported, "bringToTop", "grDevices"))
       (bind(registerUnsupported, "winMenuAdd", "utils"))
@@ -280,6 +321,5 @@ void processEvents()
 } // namespace session
 } // namespace r
 } // namespace rstudio
-
 
 

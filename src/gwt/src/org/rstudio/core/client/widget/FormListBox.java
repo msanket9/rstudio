@@ -1,7 +1,7 @@
 /*
  * FormListBox.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -26,5 +26,17 @@ public class FormListBox extends ListBox
    public void setElementId(String id)
    {
       getElement().setId(id);
+   }
+
+   public int getIndexFromValue(String value)
+   {
+      int index = 0;
+      while (index < getItemCount())
+      {
+         if (value == getValue(index))
+            return index;
+         index++;
+      }
+      return -1;
    }
 }

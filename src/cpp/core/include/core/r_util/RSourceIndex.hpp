@@ -1,7 +1,7 @@
 /*
  * RSourceIndex.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -19,20 +19,22 @@
 #include <string>
 #include <vector>
 
-#include <boost/bind.hpp>
 #include <boost/function.hpp>
 #include <boost/utility.hpp>
 #include <boost/regex.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/bind/bind.hpp>
 
 #include <core/Algorithm.hpp>
-#include <core/SafeConvert.hpp>
+#include <shared_core/SafeConvert.hpp>
 #include <core/StringUtils.hpp>
 #include <core/RegexUtils.hpp>
 
 #include <core/r_util/RTokenizer.hpp>
 #include <core/r_util/RFunctionInformation.hpp>
+
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace core {

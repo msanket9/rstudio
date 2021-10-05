@@ -1,7 +1,7 @@
 /*
  * SessionBuildErrors.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,21 +17,26 @@
 
 #include <algorithm>
 
-#include <boost/bind.hpp>
 #include <boost/regex.hpp>
 #include <boost/format.hpp>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/bind/bind.hpp>
 
-#include <core/Error.hpp>
-#include <core/SafeConvert.hpp>
+#include <shared_core/Error.hpp>
+#include <shared_core/SafeConvert.hpp>
+
 #include <core/FileSerializer.hpp>
+#include <core/Version.hpp>
 
 #include <r/RExec.hpp>
 
 #include <session/SessionModuleContext.hpp>
 #include <session/projects/SessionProjects.hpp>
 
-using namespace rstudio::core ;
+#define kAnsiEscapeRegex "(?:\033\\[\\d+m)*"
+
+using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace session {  
@@ -40,12 +45,11 @@ namespace build {
 
 namespace {
 
-
 bool isRSourceFile(const FilePath& filePath)
 {
-   return (filePath.extensionLowerCase() == ".q" ||
-           filePath.extensionLowerCase() == ".s" ||
-           filePath.extensionLowerCase() == ".r");
+   return (filePath.getExtensionLowerCase() == ".q" ||
+           filePath.getExtensionLowerCase() == ".s" ||
+           filePath.getExtensionLowerCase() == ".r");
 }
 
 bool isMatchingFile(const std::vector<std::string>& lines,
@@ -67,7 +71,7 @@ FilePath scanForRSourceFile(const FilePath& basePath,
                             const std::string& nextLineContents)
 {
    std::vector<FilePath> children;
-   Error error = basePath.children(&children);
+   Error error = basePath.getChildren(children);
    if (error)
    {
       LOG_ERROR(error);
@@ -127,7 +131,7 @@ std::vector<module_context::SourceMarker> parseRErrors(
                                                    diagLine,
                                                    match[5],
                   match[7]);
-            if (!rSrcFile.empty())
+            if (!rSrcFile.isEmpty())
             {
                // create error and add it
                SourceMarker err(SourceMarker::Error,
@@ -203,7 +207,7 @@ std::vector<module_context::SourceMarker> parseGccErrors(
          if (FilePath::isRootPath(file))
             filePath = FilePath(file);
          else
-            filePath = basePath.childPath(file);
+            filePath = basePath.completeChildPath(file);
 
          // skip if the file doesn't exist
          if (!filePath.exists())
@@ -222,7 +226,7 @@ std::vector<module_context::SourceMarker> parseGccErrors(
          // source file within the package
          if (!pkgInclude.empty())
          {
-            std::string path = filePath.absolutePath();
+            std::string path = filePath.getAbsolutePath();
             size_t pos = path.find(pkgInclude);
             if (pos != std::string::npos)
             {
@@ -232,14 +236,14 @@ std::vector<module_context::SourceMarker> parseGccErrors(
 
                // does this file exist? if so substitute it
                FilePath includePath = projectContext().buildTargetPath()
-                     .childPath("inst/include/" + relativePath);
+                                                      .completeChildPath("inst/include/" + relativePath);
                if (includePath.exists())
                   filePath = includePath;
             }
          }
 
          // don't show warnings from Makeconf
-         if (filePath.filename() == "Makeconf")
+         if (filePath.getFilename() == "Makeconf")
             continue;
 
          // create marker and add it
@@ -258,45 +262,100 @@ std::vector<module_context::SourceMarker> parseGccErrors(
 }
 
 std::vector<module_context::SourceMarker> parseTestThatErrors(
-                                           const FilePath& basePath,
-                                           const std::string& output)
+      const FilePath& basePath,
+      const std::string& output,
+      core::Version testthatVersion)
 {
    using namespace module_context;
    std::vector<SourceMarker> errors;
 
    try
    {
-      FilePath basePathResolved = module_context::resolveAliasedPath(basePath.absolutePath());
+      FilePath basePathResolved = module_context::resolveAliasedPath(basePath.getAbsolutePath());
 
-      boost::regex re("\\[[0-9]+m([^:\\n]+):([0-9]+): ?([^:\\n]+): ([^\\n]*)\\[[0-9]+m");
-
+      // Error output formats for different testthat versions:
+      //
+      // # testthat (>= 3.0.0)
+      // Failure (test-hello.R:2:3): multiplication works
+      //
+      // # testthat (< 3.0.0)
+      // test-hello.R:2: failure: multiplication works
+      //
+      // Note that ANSI escapes are also used.
+      boost::regex re;
+      if (testthatVersion.versionMajor() >= 3)
+      {
+         re = (
+                  kAnsiEscapeRegex // color
+                  "([^\\s]+)"      // error type          (1)
+                  kAnsiEscapeRegex // color
+                  "\\s+"           // separating space
+                  "\\("            // opening paren
+                  "([^:\\n]+)"     // file name           (2)
+                  ":"              // colon separator
+                  "([0-9]+)"       // file line           (3)
+                  ":"              // colon separator
+                  "([0-9]+)"       // file column         (4)
+                  "\\)"            // closing paren
+                  ":"              // colon separator
+                  "\\s+"           // separating space
+                  "([[:print:]]*)" // error message       (5)
+                  kAnsiEscapeRegex // color
+                  );
+      }
+      else
+      {
+         re = (
+                  kAnsiEscapeRegex // color
+                  "([^:\\n]+):"    // file name           (1)
+                  "([0-9]+):"      // file line           (2)
+                  "\\s*"           // spaces
+                  kAnsiEscapeRegex // color
+                  "([^:\\n]+)"     // error type          (3)
+                  kAnsiEscapeRegex // color
+                  ":"              // separating colon
+                  "\\s*"           // spaces
+                  "([[:print:]]*)" // error message       (4)
+                  kAnsiEscapeRegex // color
+                  );
+      }
+      
       boost::sregex_iterator iter(output.begin(), output.end(), re);
       boost::sregex_iterator end;
       for (; iter != end; iter++)
       {
          boost::smatch match = *iter;
-         BOOST_ASSERT(match.size() == 5);
 
-         std::string file, line, type, message, marker;
+         std::string file, line, column, type, message, marker;
          
-         file = match[1];
-         line = match[2];
-         type = match[3];
-
-         if (type.find("error") != std::string::npos) {
+         if (testthatVersion.versionMajor() >= 3)
+         {
+            type    = match[1];
+            file    = match[2];
+            line    = match[3];
+            column  = match[4];
+            message = match[5];
+         }
+         else
+         {
+            file    = match[1];
+            line    = match[2];
+            type    = match[3];
+            message = match[4];
+         }
+         
+         std::string ltype = string_utils::toLower(type);
+         if (ltype.find("error") != std::string::npos) {
             marker = "error";
-         } else if (type.find("failure") != std::string::npos) {
+         } else if (ltype.find("failure") != std::string::npos) {
             marker = "error";
-         } else if (type.find("warning") != std::string::npos) {
+         } else if (ltype.find("warning") != std::string::npos) {
             marker = "warning";
          } else {
             marker = "info";
          }
 
-         message = match[4];
-         FilePath testFilePath = basePathResolved.complete(file);
-
-         std::string column = "0";
+         FilePath testFilePath = basePathResolved.completePath(file);
          SourceMarker err(module_context::sourceMarkerTypeFromString(marker),
                           testFilePath,
                           core::safe_convert::stringTo<int>(line, 1),
@@ -321,10 +380,10 @@ std::vector<module_context::SourceMarker> parseShinyTestErrors(
 
    try
    {
-      FilePath basePathResolved = module_context::resolveAliasedPath(basePath.absolutePath());
+      FilePath basePathResolved = module_context::resolveAliasedPath(basePath.getAbsolutePath());
 
       std::vector<std::string> failed;
-      r::exec::RFunction rFunc(".rs.readShinytestResultRds", rdsPath.absolutePath());
+      r::exec::RFunction rFunc(".rs.readShinytestResultRds", rdsPath.getAbsolutePath());
       Error error = rFunc.call(&failed);
       if (error) 
          LOG_ERROR(error);
@@ -338,10 +397,18 @@ std::vector<module_context::SourceMarker> parseShinyTestErrors(
          std::string column = "0";
          type = "failure";
          message = std::string("Differences detected in " + file + ".");
-         FilePath testFilePath = basePathResolved.complete("tests").complete(file + ".R");
+
+         // ask the shinytest package where the tests live (this location varies between versions of
+         // the shinytest package
+         std::string testsDir;
+         r::exec::RFunction findTests(".rs.findShinyTestsDir", 
+               basePathResolved.getAbsolutePath());
+         error = findTests.call(&testsDir);
+         if (error)
+            LOG_ERROR(error);
 
          SourceMarker err(module_context::sourceMarkerTypeFromString(type),
-                          testFilePath,
+                          FilePath(testsDir).completePath(file + ".R"),
                           core::safe_convert::stringTo<int>(line, 1),
                           core::safe_convert::stringTo<int>(column, 1),
                           core::html_utils::HTML(message),
@@ -366,9 +433,10 @@ CompileErrorParser rErrorParser(const FilePath& basePath)
    return boost::bind(parseRErrors, basePath, _1);
 }
 
-CompileErrorParser testthatErrorParser(const FilePath& basePath)
+CompileErrorParser testthatErrorParser(const FilePath& basePath,
+                                       const core::Version& testthatVersion)
 {
-   return boost::bind(parseTestThatErrors, basePath, _1);
+   return boost::bind(parseTestThatErrors, basePath, _1, testthatVersion);
 }
 
 CompileErrorParser shinytestErrorParser(const FilePath& basePath, const FilePath& rdsPath)

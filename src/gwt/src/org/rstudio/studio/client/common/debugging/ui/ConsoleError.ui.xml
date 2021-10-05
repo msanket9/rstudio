@@ -1,5 +1,6 @@
 <!DOCTYPE ui:UiBinder SYSTEM "http://dl.google.com/gwt/DTD/xhtml.ent">
 <ui:UiBinder xmlns:ui="urn:ui:com.google.gwt.uibinder"
+   xmlns:rw='urn:import:org.rstudio.core.client.widget'
    xmlns:g="urn:import:com.google.gwt.user.client.ui">
    <ui:style>
    @eval proportionalFont org.rstudio.core.client.theme.ThemeFonts.getProportionalFont();
@@ -69,28 +70,28 @@
    <g:HTMLPanel styleName="{style.consoleErrorBox} ace_console_error">
      <g:HTMLPanel styleName="{style.consoleErrorCommands}">
         <g:HTMLPanel>
-           <g:Image resource="{traceback}"
+           <rw:DecorativeImage resource="{traceback}"
                   ui:field="showTracebackImage"
                   width="9"
                   height="9"
-                  styleName="{style.errorCommandImage}"></g:Image>
-           <g:Anchor styleName="{style.errorCommandText}" ui:field="showTracebackText">
+                  styleName="{style.errorCommandImage} show_traceback_image"/>
+           <g:Anchor styleName="{style.errorCommandText} show_traceback_text" ui:field="showTracebackText">
               Show Traceback
            </g:Anchor>
         </g:HTMLPanel>
         <g:HTMLPanel>
-           <g:Image resource="{rerun}"
+           <rw:DecorativeImage resource="{rerun}"
                     ui:field="rerunImage"
                     width="9"
                     height="9"
-                    styleName="{style.errorCommandImage}"></g:Image>
-           <g:Anchor styleName="{style.errorCommandText}" ui:field="rerunText">
+                    styleName="{style.errorCommandImage} rerun_image"/>
+           <g:Anchor styleName="{style.errorCommandText} rerun_text" ui:field="rerunText">
               Rerun with Debug
            </g:Anchor>
         </g:HTMLPanel>
      </g:HTMLPanel>
      <g:HTML ui:field="errorMessage" styleName="{style.errorMessage}"></g:HTML>
-     <g:HTMLPanel ui:field="framePanel" visible="false" styleName="{style.framePanel}">
+     <g:HTMLPanel ui:field="framePanel" visible="false" styleName="{style.framePanel} stack_trace">
      </g:HTMLPanel>
    </g:HTMLPanel>
 </ui:UiBinder> 

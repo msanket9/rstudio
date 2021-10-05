@@ -1,7 +1,7 @@
 /*
  * SessionMain.cpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,6 +18,7 @@
 // required to avoid Win64 winsock order of include
 // compilation problem
 #include <boost/asio/io_service.hpp>
+#include <boost/scope_exit.hpp>
 
 #ifndef _WIN32
 #include <sys/types.h>
@@ -43,18 +44,15 @@
 #include <boost/algorithm/string/join.hpp>
 
 #include <core/CrashHandler.hpp>
-#include <core/Error.hpp>
 #include <core/BoostSignals.hpp>
 #include <core/BoostThread.hpp>
 #include <core/ConfigUtils.hpp>
-#include <core/FilePath.hpp>
 #include <core/FileLock.hpp>
 #include <core/Exec.hpp>
 #include <core/Scope.hpp>
 #include <core/Settings.hpp>
 #include <core/Thread.hpp>
 #include <core/Log.hpp>
-#include <core/LogWriter.hpp>
 #include <core/system/System.hpp>
 #include <core/ProgramStatus.hpp>
 #include <core/FileSerializer.hpp>
@@ -67,6 +65,7 @@
 #include <core/system/Process.hpp>
 #include <core/system/Environment.hpp>
 #include <core/system/ParentProcessMonitor.hpp>
+#include <core/system/Xdg.hpp>
 
 #include <core/system/FileMonitor.hpp>
 #include <core/text/TemplateFilter.hpp>
@@ -100,6 +99,10 @@
 #include <session/SessionUrlPorts.hpp>
 #include <session/RVersionSettings.hpp>
 
+#include <shared_core/Error.hpp>
+#include <shared_core/FilePath.hpp>
+#include <shared_core/StderrLogDestination.hpp>
+
 #include "SessionAddins.hpp"
 
 #include "SessionModuleContextInternal.hpp"
@@ -119,7 +122,6 @@
 
 #include "modules/RStudioAPI.hpp"
 #include "modules/SessionAbout.hpp"
-#include "modules/SessionAgreement.hpp"
 #include "modules/SessionAskPass.hpp"
 #include "modules/SessionAskSecret.hpp"
 #include "modules/SessionAuthoring.hpp"
@@ -128,11 +130,14 @@
 #include "modules/SessionCodeSearch.hpp"
 #include "modules/SessionConfigFile.hpp"
 #include "modules/SessionConsole.hpp"
+#include "modules/SessionCRANMirrors.hpp"
 #include "modules/SessionCrypto.hpp"
 #include "modules/SessionErrors.hpp"
 #include "modules/SessionFiles.hpp"
 #include "modules/SessionFind.hpp"
+#include "modules/SessionGraphics.hpp"
 #include "modules/SessionDependencies.hpp"
+#include "modules/SessionDependencyList.hpp"
 #include "modules/SessionDirty.hpp"
 #include "modules/SessionWorkbench.hpp"
 #include "modules/SessionHelp.hpp"
@@ -153,6 +158,7 @@
 #include "modules/SessionSource.hpp"
 #include "modules/SessionTests.hpp"
 #include "modules/SessionThemes.hpp"
+#include "modules/SessionTutorial.hpp"
 #include "modules/SessionUpdates.hpp"
 #include "modules/SessionVCS.hpp"
 #include "modules/SessionHistory.hpp"
@@ -173,6 +179,7 @@
 #include "modules/rmarkdown/RMarkdownTemplates.hpp"
 #include "modules/rmarkdown/SessionRMarkdown.hpp"
 #include "modules/rmarkdown/SessionRmdNotebook.hpp"
+#include "modules/rmarkdown/SessionBookdown.hpp"
 #include "modules/shiny/SessionShiny.hpp"
 #include "modules/sql/SessionSql.hpp"
 #include "modules/stan/SessionStan.hpp"
@@ -183,12 +190,17 @@
 #include "modules/SessionUserCommands.hpp"
 #include "modules/SessionRAddins.hpp"
 #include "modules/mathjax/SessionMathJax.hpp"
+#include "modules/panmirror/SessionPanmirror.hpp"
+#include "modules/zotero/SessionZotero.hpp"
 #include "modules/SessionLibPathsIndexer.hpp"
 #include "modules/SessionObjectExplorer.hpp"
 #include "modules/SessionReticulate.hpp"
+#include "modules/SessionPythonEnvironments.hpp"
 #include "modules/SessionCrashHandler.hpp"
 #include "modules/SessionRVersions.hpp"
 #include "modules/SessionTerminal.hpp"
+#include "modules/SessionFonts.hpp"
+#include "modules/SessionSystemResources.hpp"
 
 #include <session/SessionProjectTemplate.hpp>
 
@@ -281,6 +293,7 @@ void terminateAllChildProcesses()
 
 namespace overlay {
 Error initialize();
+Error initializeSessionProxy();
 } // namespace overlay
 } // namespace session
 } // namespace rstudio
@@ -289,7 +302,7 @@ namespace {
 
 // R browseUrl handlers
 std::vector<module_context::RBrowseUrlHandler> s_rBrowseUrlHandlers;
-   
+
 // R browseFile handlers
 std::vector<module_context::RBrowseFileHandler> s_rBrowseFileHandlers;
 
@@ -300,23 +313,6 @@ bool s_destroySession = false;
 // did we fail to coerce the charset to UTF-8
 bool s_printCharsetWarning = false;
 
-#ifdef _WIN32
-
-BOOL CALLBACK handleConsoleCtrl(DWORD type)
-{
-   switch (type)
-   {
-   case CTRL_C_EVENT:
-   case CTRL_BREAK_EVENT:
-      rstudio::r::exec::setInterruptsPending(true);
-      return true;
-   default:
-      return false;
-   }
-}
-
-#endif
-
 void handleINT(int)
 {
    rstudio::r::exec::setInterruptsPending(true);
@@ -326,7 +322,7 @@ void detectChanges(module_context::ChangeSource source)
 {
    module_context::events().onDetectChanges(source);
 }
- 
+
 // allow console_input requests to come in when we aren't explicitly waiting
 // on them (i.e. waitForMethod("console_input")). place them into into a buffer
 // which is then checked by rConsoleRead prior to it calling waitForMethod
@@ -347,7 +343,14 @@ void doSuspendForRestart(const rstudio::r::session::RSuspendOptions& options)
 Error suspendForRestart(const core::json::JsonRpcRequest& request,
                         json::JsonRpcResponse* pResponse)
 {
-   rstudio::r::session::RSuspendOptions options(EX_CONTINUE);
+   // when launcher sessions restart, they need to set a special exit code
+   // to ensure that the rsession-run script restarts the rsession process
+   // instead of having to submit an entirely new launcher session
+   int exitStatus = options().getBoolOverlayOption(kLauncherSessionOption) ?
+            EX_SUSPEND_RESTART_LAUNCHER_SESSION :
+            EX_CONTINUE;
+
+   rstudio::r::session::RSuspendOptions options(exitStatus);
    Error error = json::readObjectParam(
                                request.params, 0,
                                "save_minimal", &(options.saveMinimal),
@@ -379,18 +382,12 @@ Error registerSignalHandlers()
 
    ExecBlock registerBlock;
 
-#ifdef _WIN32
-   // accept Ctrl + C interrupts
-   ::SetConsoleCtrlHandler(nullptr, FALSE);
+   module_context::initializeConsoleCtrlHandler();
 
-   // register console control handler
-   ::SetConsoleCtrlHandler(handleConsoleCtrl, TRUE);
-#endif
-   
    // SIGINT: set interrupt flag on R session
    registerBlock.addFunctions()
          (bind(handleSignal, SigInt, handleINT));
-   
+
    // USR1 and USR2: perform suspend in server mode
    if (rsession::options().programMode() == kSessionProgramModeServer)
    {
@@ -405,7 +402,7 @@ Error registerSignalHandlers()
          (bind(ignoreSignal, SigUsr1))
          (bind(ignoreSignal, SigUsr2));
    }
-   
+
    return registerBlock.execute();
 }
 
@@ -419,13 +416,13 @@ Error runPreflightScript()
    if (rsession::options().programMode() == kSessionProgramModeServer)
    {
       FilePath preflightScriptPath = options.preflightScriptPath();
-      if (!preflightScriptPath.empty())
+      if (!preflightScriptPath.isEmpty())
       {
          if (preflightScriptPath.exists())
          {
             // run the script (ignore errors and continue no matter what
             // the outcome of the script is)
-            std::string script = preflightScriptPath.absolutePath();
+            std::string script = preflightScriptPath.getAbsolutePath();
             core::system::ProcessResult result;
             Error error = runCommand(script,
                                      core::system::ProcessOptions(),
@@ -439,7 +436,7 @@ Error runPreflightScript()
          else
          {
             LOG_WARNING_MESSAGE("preflight script does not exist: " +
-                                preflightScriptPath.absolutePath());
+                                   preflightScriptPath.getAbsolutePath());
          }
       }
    }
@@ -448,17 +445,21 @@ Error runPreflightScript()
    return Success();
 }
 
+// implemented below
+void stopMonitorWorkerThread();
+
 void exitEarly(int status)
 {
+   stopMonitorWorkerThread();
    FileLock::cleanUp();
    ::exit(status);
 }
-      
-Error rInit(const rstudio::r::session::RInitInfo& rInitInfo) 
+
+Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
 {
    // save state we need to reference later
    suspend::setSessionResumed(rInitInfo.resumed);
-   
+
    // record built-in waitForMethod handlers
    module_context::registerWaitForMethod(kLocatorCompleted);
    module_context::registerWaitForMethod(kEditCompleted);
@@ -471,12 +472,12 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
    using boost::bind;
    using namespace rstudio::core::system;
    using namespace rsession::module_context;
-   ExecBlock initialize ;
+   ExecBlock initialize;
    initialize.addFunctions()
-   
+
       // client event service
       (startClientEventService)
-      
+
       // rpc methods
       (rpc::initialize)
 
@@ -490,6 +491,10 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
 
       // main module context
       (module_context::initialize)
+
+      // prefs (early init required -- many modules including projects below require
+      // preference access)
+      (modules::prefs::initialize)
 
       // projects (early project init required -- module inits below
       // can then depend on e.g. computed defaultEncoding)
@@ -506,25 +511,23 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
 
       // overlay R
       (bind(sourceModuleRFile, "SessionOverlay.R"))
-   
+
       // addins
       (addins::initialize)
 
       // console processes
       (console_process::initialize)
-         
+
       // r utils
       (r_utils::initialize)
 
       // modules with c++ implementations
-      (modules::prefs::initialize)
       (modules::spelling::initialize)
       (modules::lists::initialize)
       (modules::path::initialize)
       (modules::limits::initialize)
       (modules::ppe::initialize)
       (modules::ask_pass::initialize)
-      (modules::agreement::initialize)
       (modules::console::initialize)
 #ifdef RSTUDIO_SERVER
       (modules::crypto::initialize)
@@ -536,6 +539,7 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
       (modules::find::initialize)
       (modules::environment::initialize)
       (modules::dependencies::initialize)
+      (modules::dependency_list::initialize)
       (modules::dirty::initialize)
       (modules::workbench::initialize)
       (modules::data::initialize)
@@ -544,11 +548,13 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
       (modules::preview::initialize)
       (modules::plots::initialize)
       (modules::packages::initialize)
+      (modules::cran_mirrors::initialize)
       (modules::profiler::initialize)
       (modules::viewer::initialize)
       (modules::rmarkdown::initialize)
       (modules::rmarkdown::notebook::initialize)
       (modules::rmarkdown::templates::initialize)
+      (modules::rmarkdown::bookdown::initialize)
       (modules::rpubs::initialize)
       (modules::shiny::initialize)
       (modules::sql::initialize)
@@ -579,11 +585,14 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
       (modules::r_addins::initialize)
       (modules::projects::templates::initialize)
       (modules::mathjax::initialize)
+      (modules::panmirror::initialize)
+      (modules::zotero::initialize)
       (modules::rstudioapi::initialize)
       (modules::libpaths::initialize)
       (modules::explorer::initialize)
       (modules::ask_secret::initialize)
       (modules::reticulate::initialize)
+      (modules::python_environments::initialize)
       (modules::tests::initialize)
       (modules::jobs::initialize)
       (modules::themes::initialize)
@@ -592,15 +601,18 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
       (modules::r_versions::initialize)
       (modules::terminal::initialize)
       (modules::config_file::initialize)
+      (modules::tutorial::initialize)
+      (modules::graphics::initialize)
+      (modules::fonts::initialize)
+      (modules::system_resources::initialize)
 
       // workers
       (workers::web_request::initialize)
 
       // R code
       (bind(sourceModuleRFile, "SessionCodeTools.R"))
-      (bind(sourceModuleRFile, "SessionCompletionHooks.R"))
       (bind(sourceModuleRFile, "SessionPatches.R"))
-   
+
       // unsupported functions
       (bind(rstudio::r::function_hook::registerUnsupported, "bug.report", "utils"))
       (bind(rstudio::r::function_hook::registerUnsupported, "help.request", "utils"))
@@ -609,7 +621,7 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
    Error error = initialize.execute();
    if (error)
       return error;
-   
+
    // if we are in verify installation mode then we should exit (successfully) now
    if (rsession::options().verifyInstallation())
    {
@@ -619,10 +631,12 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
          std::cout << "Successfully initialized R session."
                    << std::endl << std::endl;
          FilePath diagFile = module_context::sourceDiagnostics();
-         if (!diagFile.empty())
+         if (!diagFile.isEmpty())
          {
             std::cout << "Diagnostics report written to: "
-                      << diagFile << std::endl << std::endl;
+                      << diagFile << std::endl
+                      << "Please audit the report and remove any sensitive information "
+                      << "before submitting." << std::endl << std::endl;
 
             Error error = rstudio::r::exec::RFunction(".rs.showDiagnostics").call();
             if (error)
@@ -641,13 +655,14 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
       int result = tests::run();
       exitEarly(result);
    }
-   
+
    // register all of the json rpc methods implemented in R
-   json::JsonRpcMethods rMethods ;
+   json::JsonRpcMethods rMethods;
    error = rstudio::r::json::getRpcMethods(&rMethods);
    if (error)
-      return error ;
-   for (const json::JsonRpcMethod& method : rMethods)
+      return error;
+
+   for (json::JsonRpcMethod method : rMethods)
    {
       registerRpcMethod(json::adaptMethodToAsync(method));
    }
@@ -686,10 +701,10 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
 #endif
 
    // clear out stale uploaded tmp files
-   if (module_context::userUploadedFilesScratchPath().exists());
+   if (module_context::userUploadedFilesScratchPath().exists())
    {
       std::vector<FilePath> childPaths;
-      error = module_context::userUploadedFilesScratchPath().children(&childPaths);
+      error = module_context::userUploadedFilesScratchPath().getChildren(childPaths);
       if (error)
          LOG_ERROR(error);
 
@@ -697,7 +712,7 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
       for (const FilePath& childPath : childPaths)
       {
          double diffTime = std::difftime(std::time(nullptr),
-                                         childPath.lastWriteTime());
+                                         childPath.getLastWriteTime());
          if (diffTime > secondsPerDay)
          {
             Error error = childPath.remove();
@@ -726,22 +741,22 @@ Error rInit(const rstudio::r::session::RInitInfo& rInitInfo)
 void notifyIfRVersionChanged()
 {
    using namespace rstudio::r::session::state;
-   
+
    SessionStateInfo info = getSessionStateInfo();
-   
+
    if (info.activeRVersion != info.suspendedRVersion)
    {
       const char* fmt =
             "R version change [%1% -> %2%] detected when restoring session; "
-            "search path not restored\n";
-      
+            "search path not restored";
+
       boost::format formatter(fmt);
       formatter
             % std::string(info.suspendedRVersion)
             % std::string(info.activeRVersion);
-      
+
       std::string msg = formatter.str();
-      ::REprintf(msg.c_str());
+      ::REprintf("%s\n", msg.c_str());
    }
 }
 
@@ -752,7 +767,7 @@ void rSessionInitHook(bool newSession)
 
    // finish off initialization
    module_context::events().afterSessionInitHook(newSession);
-   
+
    // notify the user if the R version has changed
    notifyIfRVersionChanged();
 
@@ -764,13 +779,13 @@ void rSessionInitHook(bool newSession)
 void rDeferredInit(bool newSession)
 {
    module_context::events().onDeferredInit(newSession);
-   
+
    // schedule execution of the session init hook
    module_context::scheduleDelayedWork(
                         boost::posix_time::seconds(1),
                         boost::bind(rSessionInitHook, newSession));
 }
-   
+
 int rEditFile(const std::string& file)
 {
    // read file contents
@@ -785,13 +800,13 @@ int rEditFile(const std::string& file)
          return 1; // r will raise/report an error indicating edit failed
       }
    }
-   
+
    // fire edit event
    ClientEvent editEvent = rsession::showEditorEvent(fileContents, true, false);
    rsession::clientEventQueue().add(editEvent);
 
-   // wait for edit_completed 
-   json::JsonRpcRequest request ;
+   // wait for edit_completed
+   json::JsonRpcRequest request;
    bool succeeded = http_methods::waitForMethod(kEditCompleted,
                                         editEvent,
                                         suspend::disallowSuspend,
@@ -799,13 +814,13 @@ int rEditFile(const std::string& file)
 
    if (!succeeded)
       return false;
-   
+
    // user cancelled edit
-   if (request.params[0].is_null())
+   if (request.params[0].isNull())
    {
       return 0; // no-op, object will be re-parsed from original content
    }
-   
+
    // user confirmed edit
    else
    {
@@ -815,48 +830,48 @@ int rEditFile(const std::string& file)
       if (error)
       {
          LOG_ERROR(error);
-         return 1; // error (r will notify user via the console) 
+         return 1; // error (r will notify user via the console)
       }
-      
-      // write the content back to the file (append newline expected by R) 
+
+      // write the content back to the file (append newline expected by R)
       editedFileContents += "\n";
       Error writeError = core::writeStringToFile(filePath, editedFileContents);
       if (writeError)
       {
          LOG_ERROR(writeError);
-         return 1 ; // error (r will notify user via the console) 
+         return 1 ; // error (r will notify user via the console)
       }
-      
+
       // success!
-      return 0 ;
+      return 0;
    }
 }
-   
-   
+
+
 FilePath rChooseFile(bool newFile)
 {
    // fire choose file event
    ClientEvent chooseFileEvent(kChooseFile, newFile);
    rsession::clientEventQueue().add(chooseFileEvent);
-   
-   // wait for choose_file_completed 
-   json::JsonRpcRequest request ;
+
+   // wait for choose_file_completed
+   json::JsonRpcRequest request;
    bool succeeded = http_methods::waitForMethod(kChooseFileCompleted,
                                         chooseFileEvent,
                                         suspend::disallowSuspend,
                                         &request);
-   
+
    if (!succeeded)
       return FilePath();
 
    // extract the file name
    std::string fileName;
-   if (!request.params[0].is_null())
+   if (!request.params[0].isNull())
    {
       Error error = json::readParam(request.params, 0, &fileName);
       if (error)
          LOG_ERROR(error);
-      
+
       // resolve aliases and return it
       return module_context::resolveAliasedPath(fileName);
    }
@@ -879,8 +894,8 @@ void rBusy(bool busy)
    ClientEvent busyEvent(kBusy, busy);
    rsession::clientEventQueue().add(busyEvent);
 }
-      
-void rConsoleWrite(const std::string& output, int otype)   
+
+void rConsoleWrite(const std::string& output, int otype)
 {
    if (main_process::wasForked())
       return;
@@ -896,7 +911,7 @@ void rConsoleWrite(const std::string& output, int otype)
                   output);
 
 }
-   
+
 void rConsoleHistoryReset()
 {
    json::Array historyJson;
@@ -914,13 +929,13 @@ bool rLocator(double* x, double* y)
    // here (because we'll never get back to the REPL). this enables
    // identify() to correctly update the plot after each click
    detectChanges(module_context::ChangeSourceREPL);
-   
+
    // fire locator event
    ClientEvent locatorEvent(kLocator);
    rsession::clientEventQueue().add(locatorEvent);
-   
-   // wait for locator_completed 
-   json::JsonRpcRequest request ;
+
+   // wait for locator_completed
+   json::JsonRpcRequest request;
    bool succeeded = http_methods::waitForMethod(kLocatorCompleted,
                                         locatorEvent,
                                         suspend::disallowSuspend,
@@ -928,9 +943,9 @@ bool rLocator(double* x, double* y)
 
    if (!succeeded)
       return false;
-   
+
    // see if we got a point
-   if ((request.params.size() > 0) && !request.params[0].is_null())
+   if ((request.params.getSize() > 0) && !request.params[0].isNull())
    {
       // read the x and y
       Error error = json::readObjectParam(request.params, 0,
@@ -941,7 +956,7 @@ bool rLocator(double* x, double* y)
          LOG_ERROR(error);
          return false;
       }
-      
+
       // return true
       return true;
    }
@@ -950,7 +965,7 @@ bool rLocator(double* x, double* y)
       return false;
    }
 }
-   
+
 void rShowFile(const std::string& title, const FilePath& filePath, bool del)
 {
    if (rsession::options().programMode() == kSessionProgramModeServer)
@@ -963,14 +978,14 @@ void rShowFile(const std::string& title, const FilePath& filePath, bool del)
       {
          module_context::showContent(title, filePath);
       }
-      
+
       // for files in the user's home directory and pdfs use an external browser
       else if (module_context::isVisibleUserFile(filePath) ||
-          (filePath.extensionLowerCase() == ".pdf"))
+          (filePath.getExtensionLowerCase() == ".pdf"))
       {
          module_context::showFile(filePath);
       }
-      
+
       // otherwise, show as content
       else
       {
@@ -980,7 +995,7 @@ void rShowFile(const std::string& title, const FilePath& filePath, bool del)
    else // (rsession::options().programMode() == kSessionProgramModeDesktop
    {
 #ifdef _WIN32
-    if (!filePath.extension().empty())
+    if (!filePath.getExtension().empty())
     {
        module_context::showFile(filePath);
        del = false;
@@ -1001,28 +1016,28 @@ void rShowFile(const std::string& title, const FilePath& filePath, bool del)
          LOG_ERROR(error);
    }
 }
-   
-void rBrowseURL(const std::string& url)   
+
+void rBrowseURL(const std::string& url)
 {
    // first see if any of our handlers want to take it
-   for (std::vector<module_context::RBrowseUrlHandler>::const_iterator 
-            it = s_rBrowseUrlHandlers.begin(); 
+   for (std::vector<module_context::RBrowseUrlHandler>::const_iterator
+            it = s_rBrowseUrlHandlers.begin();
             it != s_rBrowseUrlHandlers.end();
             ++it)
    {
       if ((*it)(url))
          return;
    }
-   
+
    // raise event to client
    rsession::clientEventQueue().add(browseUrlEvent(url));
 }
-   
+
 void rBrowseFile(const core::FilePath& filePath)
 {
    // see if any of our handlers want to take it
-   for (std::vector<module_context::RBrowseFileHandler>::const_iterator 
-            it = s_rBrowseFileHandlers.begin(); 
+   for (std::vector<module_context::RBrowseFileHandler>::const_iterator
+            it = s_rBrowseFileHandlers.begin();
             it != s_rBrowseFileHandlers.end();
             ++it)
    {
@@ -1032,11 +1047,11 @@ void rBrowseFile(const core::FilePath& filePath)
 
    // see if this is an html file in the session temporary directory (in which
    // case we can serve it over http)
-   if ((filePath.mimeContentType() == "text/html") &&
+   if ((filePath.getMimeContentType() == "text/html") &&
        filePath.isWithin(module_context::tempDir()) &&
        rstudio::r::util::hasRequiredVersion("2.14"))
    {
-      std::string path = filePath.relativePath(module_context::tempDir());
+      std::string path = filePath.getRelativePath(module_context::tempDir());
       std::string url = module_context::sessionTempDirUrl(path);
       rsession::clientEventQueue().add(browseUrlEvent(url));
    }
@@ -1047,13 +1062,13 @@ void rBrowseFile(const core::FilePath& filePath)
    }
 }
 
-void rShowHelp(const std::string& helpURL)   
+void rShowHelp(const std::string& helpURL)
 {
    ClientEvent showHelpEvent(kShowHelp, helpURL);
    rsession::clientEventQueue().add(showHelpEvent);
 }
-      
-void rShowMessage(const std::string& message)   
+
+void rShowMessage(const std::string& message)
 {
    ClientEvent event = showErrorMessageEvent("R Error", message);
    rsession::clientEventQueue().add(event);
@@ -1065,7 +1080,7 @@ void logExitEvent(const monitor::Event& precipitatingEvent)
    client().logEvent(precipitatingEvent);
    client().logEvent(Event(kSessionScope, kSessionExitEvent));
 }
-   
+
 void rSuspended(const rstudio::r::session::RSuspendOptions& options)
 {
    // log to monitor
@@ -1078,7 +1093,7 @@ void rSuspended(const rstudio::r::session::RSuspendOptions& options)
    // fire event
    module_context::onSuspended(options, &(persistentState().settings()));
 }
-   
+
 void rResumed()
 {
    module_context::onResumed(persistentState().settings());
@@ -1094,7 +1109,7 @@ bool rHandleUnsavedChanges()
    json::JsonRpcRequest request;
    bool succeeded = http_methods::waitForMethod(
                         kHandleUnsavedChangesCompleted,
-                        boost::bind(http_methods::waitForMethodInitFunction, 
+                        boost::bind(http_methods::waitForMethodInitFunction,
                                     event),
                         suspend::disallowSuspend,
                         &request);
@@ -1111,7 +1126,7 @@ bool rHandleUnsavedChanges()
 }
 
 void rQuit()
-{   
+{
    if (main_process::wasForked())
       return;
 
@@ -1143,7 +1158,7 @@ void rQuit()
    ClientEvent quitEvent(kQuit, jsonData);
    rsession::clientEventQueue().add(quitEvent);
 }
-   
+
 // NOTE: this event is never received on windows (because we can't
 // override suicide on windows)
 void rSuicide(const std::string& message)
@@ -1158,7 +1173,7 @@ void rSuicide(const std::string& message)
    // log the error if it was unexpected
    if (!message.empty())
       LOG_ERROR_MESSAGE("R SUICIDE: " + message);
-   
+
    // enque suicide event so the client knows
    ClientEvent suicideEvent(kSuicide, message);
    rsession::clientEventQueue().add(suicideEvent);
@@ -1210,9 +1225,19 @@ void rCleanup(bool terminatedNormally)
          // fire destroy event to modules
          module_context::events().onDestroyed();
       }
-      
+
       // clean up locks
       FileLock::cleanUp();
+
+      // stop file monitor (need to do this explicitly as otherwise we can
+      // run into issues during close where the runtime attempts to clean
+      // up its data structures at same time that monitor wants to exit)
+      //
+      // https://github.com/rstudio/rstudio/issues/5222
+      system::file_monitor::stop();
+
+      // stop the monitor thread
+      stopMonitorWorkerThread();
 
       // cause graceful exit of clientEventService (ensures delivery
       // of any pending events prior to process termination). wait a
@@ -1241,23 +1266,23 @@ void rCleanup(bool terminatedNormally)
    }
    CATCH_UNEXPECTED_EXCEPTION
 
-}   
-   
+}
+
 void rSerialization(int action, const FilePath& targetPath)
 {
-   json::Object serializationActionObject ;
+   json::Object serializationActionObject;
    serializationActionObject["type"] = action;
-   if (!targetPath.empty())
+   if (!targetPath.isEmpty())
    {
       serializationActionObject["targetPath"] =
                            module_context::createAliasedPath(targetPath);
    }
-   
+
    ClientEvent event(kSessionSerialization, serializationActionObject);
    rsession::clientEventQueue().add(event);
 }
 
-   
+
 void ensureRProfile()
 {
    // check if we need to create the profile (bail if we don't)
@@ -1265,11 +1290,11 @@ void ensureRProfile()
    if (!options.createProfile())
       return;
 
-   FilePath rProfilePath = options.userHomePath().complete(".Rprofile");
+   FilePath rProfilePath = options.userHomePath().completePath(".Rprofile");
    if (!rProfilePath.exists() && !prefs::userState().autoCreatedProfile())
    {
       prefs::userState().setAutoCreatedProfile(true);
-      
+
       std::string p;
       p = "# .Rprofile -- commands to execute at the beginning of each R session\n"
           "#\n"
@@ -1278,13 +1303,13 @@ void ensureRProfile()
           "# NOTE: changes in this file won't be reflected until after you quit\n"
           "# and start a new session\n"
           "#\n\n";
-      
+
       Error error = writeStringToFile(rProfilePath, p);
       if (error)
          LOG_ERROR(error);
    }
 }
-      
+
 void ensurePublicFolder()
 {
    // check if we need to create the public folder (bail if we don't)
@@ -1292,7 +1317,7 @@ void ensurePublicFolder()
    if (!options.createPublicFolder())
       return;
 
-   FilePath publicPath = options.userHomePath().complete("Public");
+   FilePath publicPath = options.userHomePath().completePath("Public");
    if (!publicPath.exists())
    {
       // create directory
@@ -1330,7 +1355,7 @@ void ensurePublicFolder()
       );
       std::string notice = boost::str(fmt % options.userIdentity());
 
-      FilePath noticePath = publicPath.complete("AboutPublic.txt");
+      FilePath noticePath = publicPath.completePath("AboutPublic.txt");
       error = writeStringToFile(noticePath, notice);
       if (error)
          LOG_ERROR(error);
@@ -1410,7 +1435,7 @@ bool restoreWorkspaceOption()
       return false;
    else if (options().rRestoreWorkspace() == kRestoreWorkspaceYes)
       return true;
-   
+
    // allow project override
    const projects::ProjectContext& projContext = projects::projectContext();
    if (projContext.hasProject())
@@ -1429,7 +1454,7 @@ bool restoreWorkspaceOption()
 
    // no project override
    return prefs::userPrefs().loadWorkspace() ||
-          !rsession::options().initialEnvironmentFileOverride().empty();
+          !rsession::options().initialEnvironmentFileOverride().isEmpty();
 }
 
 bool alwaysSaveHistoryOption()
@@ -1440,10 +1465,28 @@ bool alwaysSaveHistoryOption()
 FilePath getStartupEnvironmentFilePath()
 {
    FilePath envFile = rsession::options().initialEnvironmentFileOverride();
-   if (!envFile.empty())
+   if (!envFile.isEmpty())
       return envFile;
    else
-      return dirs::rEnvironmentDir().complete(".RData");
+      return dirs::rEnvironmentDir().completePath(".RData");
+}
+
+void loadCranRepos(const std::string& repos,
+                   rstudio::r::session::ROptions* pROptions)
+{
+   std::vector<std::string> parts;
+   boost::split(parts, repos, boost::is_any_of("|"));
+   pROptions->rCRANSecondary = "";
+
+   std::vector<std::string> secondary;
+   for (size_t idxParts = 0; idxParts < parts.size() - 1; idxParts += 2)
+   {
+      if (string_utils::toLower(parts[idxParts]) == "cran")
+         pROptions->rCRANUrl = parts[idxParts + 1];
+      else
+         secondary.push_back(std::string(parts[idxParts]) + "|" + parts[idxParts + 1]);
+   }
+   pROptions->rCRANSecondary = algorithm::join(secondary, "|");
 }
 
 } // anonymous namespace
@@ -1451,15 +1494,15 @@ FilePath getStartupEnvironmentFilePath()
 
 // provide definition methods for rsession::module_context
 namespace rstudio {
-namespace session { 
+namespace session {
 namespace module_context {
-   
+
 Error registerRBrowseUrlHandler(const RBrowseUrlHandler& handler)
 {
    s_rBrowseUrlHandlers.push_back(handler);
    return Success();
 }
-   
+
 Error registerRBrowseFileHandler(const RBrowseFileHandler& handler)
 {
    s_rBrowseFileHandlers.push_back(handler);
@@ -1481,7 +1524,7 @@ UserPrompt::Response showUserPrompt(const UserPrompt& userPrompt)
    rsession::clientEventQueue().add(userPromptEvent);
 
    // wait for user_prompt_completed
-   json::JsonRpcRequest request ;
+   json::JsonRpcRequest request;
    http_methods::waitForMethod(kUserPromptCompleted,
                        userPromptEvent,
                        suspend::disallowSuspend,
@@ -1545,7 +1588,7 @@ int saveWorkspaceAction()
       return rstudio::r::session::kSaveActionNoSave;
    else if (action == kSaveWorkspaceAsk)
       return rstudio::r::session::kSaveActionAsk;
-   
+
    return rstudio::r::session::kSaveActionAsk;
 }
 
@@ -1563,9 +1606,8 @@ namespace {
 int sessionExitFailure(const core::Error& error,
                        const core::ErrorLocation& location)
 {
-   if (!error.expected())
+   if (error)
       core::log::logError(error, location);
-
    return EXIT_FAILURE;
 }
 
@@ -1645,37 +1687,70 @@ bool ensureUtf8Charset()
 #endif
 }
 
+// io_service for performing monitor work on the thread
+boost::asio::io_service s_monitorIoService;
+
+void monitorWorkerThreadFunc()
+{
+   boost::asio::io_service::work work(s_monitorIoService);
+   s_monitorIoService.run();
+}
+
+void stopMonitorWorkerThread()
+{
+   s_monitorIoService.stop();
+}
+
 void initMonitorClient()
 {
    if (!options().getBoolOverlayOption(kLauncherSessionOption))
    {
-      monitor::initializeMonitorClient(kMonitorSocketPath,
-                                       options().monitorSharedSecret());
+      monitor::initializeMonitorClient(core::system::getenv(kMonitorSocketPathEnvVar),
+                                       options().monitorSharedSecret(),
+                                       s_monitorIoService);
    }
    else
    {
-      modules::overlay::initMonitorClient();
+      modules::overlay::initMonitorClient(s_monitorIoService);
    }
+
+   // start the monitor work thread
+   // we handle monitor calls in a separate thread to ensure that calls
+   // to the monitor (which are likely across machines and thus very expensive)
+   // do not hamper the liveliness of the session as a whole
+   core::thread::safeLaunchThread(monitorWorkerThreadFunc);
 }
 
 } // anonymous namespace
 
 // run session
-int main (int argc, char * const argv[]) 
+int main (int argc, char * const argv[])
 {
    try
    {
+      // sleep on startup if requested (mainly for debugging)
+      std::string sleepOnStartup = core::system::getenv("RSTUDIO_SESSION_SLEEP_ON_STARTUP");
+      if (!sleepOnStartup.empty())
+      {
+         int sleepDuration = core::safe_convert::stringTo<int>(sleepOnStartup, 0);
+         if (sleepDuration > 0)
+         {
+            boost::this_thread::sleep(boost::posix_time::seconds(sleepDuration));
+         }
+      }
+
       // initialize log so we capture all errors including ones which occur
       // reading the config file (if we are in desktop mode then the log
       // will get re-initialized below)
-      initializeSystemLog("rsession-" + core::system::username(),
-                          core::system::kLogLevelWarning);
+      std::string programId = "rsession-" + core::system::username();
+      core::log::setProgramId(programId);
+      core::system::initializeSystemLog(programId, core::log::LogLevel::WARN);
 
       // ignore SIGPIPE
       Error error = core::system::ignoreSignal(core::system::SigPipe);
       if (error)
          LOG_ERROR(error);
-      
+
       // move to own process group
 #ifndef _WIN32
       ::setpgrp();
@@ -1690,18 +1765,49 @@ int main (int argc, char * const argv[])
       r_util::ensureLang();
 #endif
       s_printCharsetWarning = !ensureUtf8Charset();
-      
+
+      // remove DYLD_INSERT_LIBRARIES variable (injected on macOS Desktop
+      // to support restrictions with hardened runtime)
+#ifdef __APPLE__
+      core::system::unsetenv("DYLD_INSERT_LIBRARIES");
+#endif
+
+      // fix up HOME / R_USER environment variables
+      // (some users on Windows report these having trailing
+      // slashes, which confuses a number of RStudio routines)
+      boost::regex reTrailing("[/\\\\]+$");
+      for (const std::string& envvar : {"HOME", "R_USER"})
+      {
+         std::string oldVal = core::system::getenv(envvar);
+         if (!oldVal.empty())
+         {
+            std::string newVal = boost::regex_replace(oldVal, reTrailing, "");
+            if (oldVal != newVal)
+               core::system::setenv(envvar, newVal);
+         }
+      }
+
       // read program options
       std::ostringstream osWarnings;
       Options& options = rsession::options();
-      ProgramStatus status = options.read(argc, argv, osWarnings) ;
+      ProgramStatus status = options.read(argc, argv, osWarnings);
       std::string optionsWarnings = osWarnings.str();
 
       if (!optionsWarnings.empty())
          program_options::reportWarnings(optionsWarnings, ERROR_LOCATION);
 
       if (status.exit())
-         return status.exitCode() ;
+         return status.exitCode();
+
+      // print version if requested
+      if (options.version())
+      {
+         std::string gitCommit(RSTUDIO_GIT_COMMIT);
+         std::cout << RSTUDIO_VERSION ", \"" RSTUDIO_RELEASE_NAME "\" "
+                      "(" << gitCommit.substr(0, 8) << ", " RSTUDIO_BUILD_DATE ") "
+                      "for " RSTUDIO_PACKAGE_OS << std::endl;
+         return 0;
+      }
 
       // convenience flags for server and desktop mode
       bool desktopMode = options.programMode() == kSessionProgramModeDesktop;
@@ -1720,34 +1826,41 @@ int main (int argc, char * const argv[])
       core::system::setenv(kRStudioProgramMode, options.programMode());
 
       // reflect stderr logging
-      core::system::setLogToStderr(options.logStderr());
+      if (options.logStderr())
+         log::addLogDestination(
+            std::shared_ptr<log::ILogDestination>(new log::StderrLogDestination(log::LogLevel::WARN)));
 
-      // initialize monitor
+      // initialize monitor but stop its thread on exit
       initMonitorClient();
-
-      // register monitor log writer (but not in standalone mode)
-      if (!options.standalone())
+      BOOST_SCOPE_EXIT(void)
       {
-         core::system::addLogWriter(monitor::client().createLogWriter(
-                                                options.programIdentity()));
+         stopMonitorWorkerThread();
+      }
+      BOOST_SCOPE_EXIT_END
+
+      // register monitor log writer (but not in standalone or verify installation mode)
+      if (!options.standalone() && !options.verifyInstallation())
+      {
+         core::log::addLogDestination(
+            monitor::client().createLogDestination(log::LogLevel::WARN, options.programIdentity()));
       }
 
       // initialize file lock config
-      FileLock::initialize();
+      FileLock::initialize(desktopMode ? FileLock::LOCKTYPE_ADVISORY : FileLock::LOCKTYPE_LINKBASED);
 
       // re-initialize log for desktop mode
       if (desktopMode)
       {
          if (options.verifyInstallation())
          {
-            initializeStderrLog(options.programIdentity(),
-                                core::system::kLogLevelWarning);
+            core::system::initializeStderrLog(options.programIdentity(),
+                                core::log::LogLevel::WARN);
          }
          else
          {
-            initializeLog(options.programIdentity(),
-                          core::system::kLogLevelWarning,
-                          options.userLogPath());
+            core::system::initializeLog(options.programIdentity(),
+                                        core::log::LogLevel::WARN,
+                                        options.userLogPath());
          }
       }
 
@@ -1765,7 +1878,7 @@ int main (int argc, char * const argv[])
                safe_convert::numberToString(rstudio::r::options::kDefaultWidth));
 
       // set the rstudio user identity environment variable (can differ from
-      // username in debug configurations). this is provided so that 
+      // username in debug configurations). this is provided so that
       // rpostback knows what local stream to connect back to
       core::system::setenv(kRStudioUserIdentity, options.userIdentity());
       if (desktopMode)
@@ -1787,7 +1900,7 @@ int main (int argc, char * const argv[])
       {
          core::system::setenv(kRSessionStandalonePortNumber, options.wwwPort());
       }
-           
+
       // ensure we aren't being started as a low (priviliged) account
       if (serverMode &&
           !options.verifyInstallation() &&
@@ -1828,58 +1941,65 @@ int main (int argc, char * const argv[])
 
       // set the rpostback absolute path
       FilePath rpostback = options.rpostbackPath()
-                           .parent().parent()
-                           .childPath("rpostback");
+                                  .getParent().getParent()
+                                  .completeChildPath("rpostback");
       core::system::setenv(
             "RS_RPOSTBACK_PATH",
-            string_utils::utf8ToSystem(rpostback.absolutePath()));
+            string_utils::utf8ToSystem(rpostback.getAbsolutePath()));
 
-      // determine if this is a new user and get the first project path if so
       std::string firstProjectPath = "";
-      bool newUser = false;
-
-      FilePath userScratchPath = options.userScratchPath();
-      if (userScratchPath.exists())
+      if (!options.verifyInstallation())
       {
-         std::vector<FilePath> scratchChildren;
-         userScratchPath.children(&scratchChildren);
+         // Validate the config and data directories.
+         core::system::xdg::verifyUserDirs();
 
-         if (scratchChildren.size() == 0)
-            newUser = true;
-      }
-      else
-      {
-         // create the scratch path
-         error = userScratchPath.ensureDirectory();
-         if (error)
-            return sessionExitFailure(error, ERROR_LOCATION);
+         // determine if this is a new user and get the first project path if so
+         bool newUser = false;
 
-         newUser = true;
-      }
-
-      if (newUser)
-      {
-         // this is a brand new user
-         // check to see if there is a first project template
-         if (!options.firstProjectTemplatePath().empty())
+         FilePath userScratchPath = options.userScratchPath();
+         if (userScratchPath.exists())
          {
-            // copy the project template to the user's home dir
-            FilePath templatePath = FilePath(options.firstProjectTemplatePath());
-            if (templatePath.exists())
+            // if the lists directory has not yet been created,
+            // this is a new user
+            FilePath listsPath = userScratchPath.completeChildPath("monitored/lists");
+            if (!listsPath.exists())
+               newUser = true;
+         }
+         else
+         {
+            // create the scratch path
+            error = userScratchPath.ensureDirectory();
+            if (error)
+               return sessionExitFailure(error, ERROR_LOCATION);
+
+            newUser = true;
+         }
+
+         if (newUser)
+         {
+            // this is a brand new user
+            // check to see if there is a first project template
+            if (!options.firstProjectTemplatePath().empty())
             {
-               error = templatePath.copyDirectoryRecursive(options.userHomePath().childPath(
-                                                              templatePath.filename()));
-               if (error)
-                  LOG_ERROR(error);
-               else
+               // copy the project template to the user's home dir
+               FilePath templatePath = FilePath(options.firstProjectTemplatePath());
+               if (templatePath.exists())
                {
-                  FilePath firstProjPath = options.userHomePath().childPath(templatePath.filename())
-                        .childPath(templatePath.filename() + ".Rproj");
-                  if (firstProjPath.exists())
-                     firstProjectPath = firstProjPath.absolutePath();
+                  error = templatePath.copyDirectoryRecursive(
+                     options.userHomePath().completeChildPath(
+                        templatePath.getFilename()));
+                  if (error)
+                     LOG_ERROR(error);
                   else
-                     LOG_WARNING_MESSAGE("Could not find first project path " + firstProjPath.absolutePath() +
-                                         ". Please ensure the template contains an Rproj file.");
+                  {
+                     FilePath firstProjPath = options.userHomePath().completeChildPath(templatePath.getFilename())
+                                                     .completeChildPath(templatePath.getFilename() + ".Rproj");
+                     if (firstProjPath.exists())
+                        firstProjectPath = firstProjPath.getAbsolutePath();
+                     else
+                        LOG_WARNING_MESSAGE("Could not find first project path " + firstProjPath.getAbsolutePath() +
+                                            ". Please ensure the template contains an Rproj file.");
+                  }
                }
             }
          }
@@ -1900,7 +2020,7 @@ int main (int argc, char * const argv[])
       // initialize persistent state
       error = rsession::persistentState().initialize();
       if (error)
-         return sessionExitFailure(error, ERROR_LOCATION) ;
+         return sessionExitFailure(error, ERROR_LOCATION);
 
       // set working directory
       FilePath workingDir = dirs::getInitialWorkingDirectory();
@@ -1912,11 +2032,17 @@ int main (int argc, char * const argv[])
       // it is created with the default value of ~, so if our session options
       // have specified that a different directory should be used, we should
       // persist the value to the session state as soon as possible
-      module_context::activeSession().setWorkingDir(workingDir.absolutePath());
+      module_context::activeSession().setWorkingDir(workingDir.getAbsolutePath());
 
       // start http connection listener
       error = waitWithTimeout(
             http_methods::startHttpConnectionListenerWithTimeout, 0, 100, 1);
+      if (error)
+         return sessionExitFailure(error, ERROR_LOCATION);
+
+      // start session proxy to route traffic to localhost-listening applications (like Shiny)
+      // this has to come after regular overlay initialization as it depends on persistent state
+      error = overlay::initializeSessionProxy();
       if (error)
          return sessionExitFailure(error, ERROR_LOCATION);
 
@@ -1943,7 +2069,7 @@ int main (int argc, char * const argv[])
       // we've gotten through startup so let's log a start event
       using namespace monitor;
       client().logEvent(Event(kSessionScope, kSessionStartEvent));
-      
+
       // install home and doc dir overrides if requested (for debugger mode)
       if (!options.rHomeDirOverride().empty())
          core::system::setenv("R_HOME", options.rHomeDirOverride());
@@ -1954,9 +2080,9 @@ int main (int argc, char * const argv[])
       modules::console::syncConsoleColorEnv();
 
       // r options
-      rstudio::r::session::ROptions rOptions ;
+      rstudio::r::session::ROptions rOptions;
       rOptions.userHomePath = options.userHomePath();
-      rOptions.userScratchPath = userScratchPath;
+      rOptions.userScratchPath = options.userScratchPath();
       rOptions.scopedScratchPath = module_context::scopedScratchPath();
       rOptions.sessionScratchPath = module_context::sessionScratchPath();
       rOptions.logPath = options.userLogPath();
@@ -1969,33 +2095,62 @@ int main (int argc, char * const argv[])
       if (!desktopMode) // ignore r-libs-user in desktop mode
          rOptions.rLibsUser = options.rLibsUser();
 
-      bool customRepo = true;
-
-      // CRAN repos precedence: user setting then repos file then global server option
-      if (prefs::userState().cranMirrorChanged()) {
+      // CRAN repos configuration follows; order of precedence is:
+      //
+      // 1. The user's personal preferences file (rstudio-prefs.json) or system-level version of
+      //    same
+      // 2. The repo settings specified in the loaded version of R
+      // 3. The session's repo settings (in rsession.conf/repos.conf)
+      // 4. The server's repo settings
+      // 5. The default repo settings from the preferences schema (user-prefs-schema.json)
+      // 6. If all else fails, cran.rstudio.com
+      std::string layerName;
+      auto val = prefs::userPrefs().readValue(kCranMirror, &layerName);
+      if (val && (layerName == kUserPrefsUserLayer ||
+                  layerName == kUserPrefsSystemLayer))
+      {
+         // There is a user-scoped value, so use it
          rOptions.rCRANUrl = prefs::userPrefs().getCRANMirror().url;
          rOptions.rCRANSecondary = prefs::userPrefs().getCRANMirror().secondary;
       }
-      else if (!options.rCRANMultipleRepos().empty()) {
-         std::vector<std::string> parts;
-         std::string repos = options.rCRANMultipleRepos();
-         boost::split(parts, repos, boost::is_any_of("|"));
-         rOptions.rCRANSecondary = "";
+      else if (!core::system::getenv("RSTUDIO_R_REPO").empty())
+      {
+         // repo was specified in the r version
+         std::string repo = core::system::getenv("RSTUDIO_R_REPO");
 
-         std::vector<std::string> secondary;
-         for (size_t idxParts = 0; idxParts < parts.size() - 1; idxParts += 2) {
-            if (string_utils::toLower(parts[idxParts]) == "cran")
-               rOptions.rCRANUrl = parts[idxParts + 1];
-            else
-               secondary.push_back(std::string(parts[idxParts]) + "|" + parts[idxParts + 1]);
+         // the repo can either be a repos.conf-style file, or a URL
+         FilePath reposFile(repo);
+         if (reposFile.exists())
+         {
+            std::string reposConfig = Options::parseReposConfig(reposFile);
+            loadCranRepos(reposConfig, &rOptions);
          }
-         rOptions.rCRANSecondary = algorithm::join(secondary, "|");
+         else
+         {
+            rOptions.rCRANUrl = repo;
+         }
+      }
+      else if (!options.rCRANMultipleRepos().empty())
+      {
+         // repo was specified in a repos file
+         loadCranRepos(options.rCRANMultipleRepos(), &rOptions);
       }
       else if (!options.rCRANUrl().empty())
+      {
+         // Global server option
          rOptions.rCRANUrl = options.rCRANUrl();
-      else {
+      }
+      else if (val && layerName == kUserPrefsDefaultLayer)
+      {
+         // If we found defaults in the prefs schema, use them.
+         rOptions.rCRANUrl = prefs::userPrefs().getCRANMirror().url;
+         rOptions.rCRANSecondary = prefs::userPrefs().getCRANMirror().secondary;
+      }
+      else
+      {
+         // Hard-coded repo of last resort so we don't wind up without a repo setting (users will
+         // not be able to install packages without one)
          rOptions.rCRANUrl = "https://cran.rstudio.com/";
-         customRepo = false;
       }
 
       rOptions.useInternet2 = prefs::userPrefs().useInternet2();
@@ -2019,7 +2174,8 @@ int main (int argc, char * const argv[])
       rOptions.packratEnabled = persistentState().settings().getBool("packratEnabled");
       rOptions.sessionScope = options.sessionScope();
       rOptions.runScript = options.runScript();
-      
+      rOptions.suspendOnIncompleteStatement = options.suspendOnIncompleteStatement();
+
       // r callbacks
       rstudio::r::session::RCallbacks rCallbacks;
       rCallbacks.init = rInit;
@@ -2037,7 +2193,7 @@ int main (int argc, char * const argv[])
       rCallbacks.handleUnsavedChanges = rHandleUnsavedChanges;
       rCallbacks.quit = rQuit;
       rCallbacks.suicide = rSuicide;
-      rCallbacks.cleanup = rCleanup ;
+      rCallbacks.cleanup = rCleanup;
       rCallbacks.browseURL = rBrowseURL;
       rCallbacks.browseFile = rBrowseFile;
       rCallbacks.showHelp = rShowHelp;
@@ -2045,7 +2201,7 @@ int main (int argc, char * const argv[])
       rCallbacks.serialization = rSerialization;
 
       // run r (does not return, terminates process using exit)
-      error = rstudio::r::session::run(rOptions, rCallbacks) ;
+      error = rstudio::r::session::run(rOptions, rCallbacks);
       if (error)
       {
           // this is logically equivilant to R_Suicide
@@ -2054,15 +2210,12 @@ int main (int argc, char * const argv[])
           // return failure
           return sessionExitFailure(error, ERROR_LOCATION);
       }
-      
+
       // return success for good form
       return EXIT_SUCCESS;
    }
    CATCH_UNEXPECTED_EXCEPTION
-   
+
    // if we got this far we had an unexpected exception
-   return EXIT_FAILURE ;
+   return EXIT_FAILURE;
 }
-
-
-

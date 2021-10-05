@@ -1,7 +1,7 @@
 #
 # SessionConnectionsInstaller.R
 #
-# Copyright (C) 2009-18 by RStudio, Inc.
+# Copyright (C) 2021 by RStudio, PBC
 #
 # Unless you have received this program directly from RStudio pursuant
 # to the terms of a commercial license agreement with RStudio, then
@@ -333,13 +333,32 @@
    prereqs()
 })
 
-.rs.addFunction("odbcBundleOdbcinstPath", function() {
+.rs.addFunction("odbcBundleOdbcinstPathWithOdbcinst", function() {
    config <- system2("odbcinst", "-j", stdout = TRUE)
    odbciniEntry <- config[grepl("odbcinst.ini", config)]
    gsub("^[^/\\\\]*", "", odbciniEntry)
 })
 
+.rs.addFunction("odbcBundleOdbcinstPathUseHome", function() {
+   normalizePath("~/.odbcinst.ini", mustWork = FALSE)
+})
+
+.rs.addFunction("odbcBundleOdbcinstPath", function() {
+   osOdbcinstPath <- list(
+      osx = .rs.odbcBundleOdbcinstPathWithOdbcinst,
+      windows = .rs.odbcBundleOdbcinstPathWithOdbcinst,
+      linux = .rs.odbcBundleOdbcinstPathUseHome
+   )
+
+   osOdbcinstPath[[.rs.odbcBundleOsName()]]()
+})
+
 .rs.addFunction("odbcBundleReadIni", function(odbcinstPath) {
+
+   # return nothing if file doesn't exist
+   if (!file.exists(odbcinstPath))
+      return(list())
+
    lines <- readLines(odbcinstPath)
    data <- list()
    
@@ -347,7 +366,7 @@
    
    for (line in lines) {
       # Is header?
-      if (grepl(" *\\[[^]]+\\] *", line)) {
+      if (grepl("^ *\\[[^]]+\\] *", line)) {
          currentDriver <- gsub("^ *\\[|\\] *", "", line)
          data[[currentDriver]] <- ""
       }
@@ -468,6 +487,11 @@
          list(
             path = file.path("SOFTWARE", "ODBC", "ODBCINST.INI", name, fsep = "\\"),
             key = "Driver",
+            value = driverPath
+         ),
+         list(
+            path = file.path("SOFTWARE", "ODBC", "ODBCINST.INI", name, fsep = "\\"),
+            key = "Setup",
             value = driverPath
          ),
          list(

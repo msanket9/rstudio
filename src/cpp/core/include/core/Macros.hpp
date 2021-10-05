@@ -1,7 +1,7 @@
 /*
  * Macros.hpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -18,6 +18,14 @@
 
 #include <iostream>
 #include <iomanip>
+
+#define RS_CALL_ONCE()                                                         \
+   do                                                                          \
+   {                                                                           \
+      static bool s_once = false;                                              \
+      if (s_once) return;                                                      \
+      s_once = true;                                                           \
+   } while (0)
 
 /* Work around Xcode indentation rules */
 #define RS_BEGIN_NAMESPACE(__X__) namespace __X__ {
@@ -93,20 +101,24 @@
 
 #endif /* Debug logging macros */
 
-#ifndef DEBUG
-# define DEBUG RSTUDIO_DEBUG
-#endif
+#ifndef RSTUDIO_DEBUG_MACROS_DISABLED
 
-#ifndef DEBUG_LINE
-# define DEBUG_LINE RSTUDIO_DEBUG_LINE
-#endif
+# ifndef DEBUG
+#  define DEBUG RSTUDIO_DEBUG
+# endif
 
-#ifndef DEBUG_BLOCK
-# define DEBUG_BLOCK RSTUDIO_DEBUG_BLOCK
-#endif
+# ifndef DEBUG_LINE
+#  define DEBUG_LINE RSTUDIO_DEBUG_LINE
+# endif
 
-#ifndef LOG_OBJECT
-# define LOG_OBJECT(x) RSTUDIO_LOG_OBJECT(x)
+# ifndef DEBUG_BLOCK
+#  define DEBUG_BLOCK RSTUDIO_DEBUG_BLOCK
+# endif
+
+# ifndef LOG_OBJECT
+#  define LOG_OBJECT(x) RSTUDIO_LOG_OBJECT(x)
+# endif
+
 #endif
 
 #endif

@@ -1,7 +1,7 @@
 /*
  * SessionDirty.cpp
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -17,14 +17,14 @@
 
 #include <algorithm>
 
-#include <boost/bind.hpp>
 #include <boost/format.hpp>
 #include <boost/utility.hpp>
+#include <boost/bind/bind.hpp>
 
-#include <core/Error.hpp>
+#include <shared_core/Error.hpp>
 #include <core/Log.hpp>
 #include <core/Exec.hpp>
-#include <core/FilePath.hpp>
+#include <shared_core/FilePath.hpp>
 
 #include <core/json/JsonRpc.hpp>
 
@@ -36,9 +36,10 @@
 #include <session/SessionModuleContext.hpp>
 #include <session/SessionSourceDatabase.hpp>
 
-using namespace rstudio::core ;
+using namespace rstudio::core;
 using namespace rstudio::r::sexp;
 using namespace rstudio::r::exec;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace session {

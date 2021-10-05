@@ -1,7 +1,7 @@
 /*
  * LintPresenter.java
  *
- * Copyright (C) 2009-12 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -20,7 +20,6 @@ import org.rstudio.studio.client.RStudioGinjector;
 import org.rstudio.studio.client.application.events.EventBus;
 import org.rstudio.studio.client.common.RetinaStyleInjector;
 import org.rstudio.studio.client.common.filetypes.TextFileType;
-import org.rstudio.studio.client.common.spelling.TypoSpellChecker;
 import org.rstudio.studio.client.server.ServerError;
 import org.rstudio.studio.client.server.ServerRequestCallback;
 import org.rstudio.studio.client.server.Void;
@@ -83,8 +82,13 @@ public class LintManager
    private boolean isLintableDocument()
    {
       TextFileType type = docDisplay_.getFileType();
-      return (((type.isC() || type.isCpp()) && userPrefs_.showDiagnosticsCpp().getValue()) ||
-              ((type.isR() || type.isRmd() || type.isRnw() || type.isRpres()) && userPrefs_.showDiagnosticsR().getValue()));
+      if (type.isC() || type.isCpp())
+         return userPrefs_.showDiagnosticsCpp().getValue();
+      
+      if (type.isR() || type.isRnw() || type.isRpres() || type.isMarkdown())
+         return userPrefs_.showDiagnosticsR().getValue() || userPrefs_.realTimeSpellchecking().getValue();
+      
+      return false;
    }
 
    public LintManager(TextEditingTarget target,
@@ -192,7 +196,7 @@ public class LintManager
 
       if (context.showMarkers)
       {
-         target_.saveThenExecute(null, new Command()
+         target_.saveThenExecute(null, false, new Command()
          {
             @Override
             public void execute()
@@ -203,7 +207,7 @@ public class LintManager
       }
       else
       {
-         target_.withSavedDoc(new Command()
+         target_.withSavedDocNoRetry(new Command()
          {
             @Override
             public void execute()
@@ -218,12 +222,12 @@ public class LintManager
    {
       if (context.token.isInvalid())
          return;
-      
-      if (target_.getTextFileType().isCpp() || target_.getTextFileType().isC())
+
+      if (userPrefs_.showDiagnosticsCpp().getValue() && (target_.getTextFileType().isCpp() || target_.getTextFileType().isC()))
          performCppLintServerRequest(context);
-      else if (target_.getTextFileType().isR())
+      else if (userPrefs_.showDiagnosticsR().getValue() && (target_.getTextFileType().isR() || target_.getTextFileType().isRmd()))
          performRLintServerRequest(context);
-      else if (target_.getTextFileType().isRmd())
+      else if (userPrefs_.realTimeSpellchecking().getValue())
          showLint(context, JsArray.createArray().cast());
    }
 
@@ -333,15 +337,28 @@ public class LintManager
       else
          finalLint = lint;
 
-      if (userPrefs_.realTimeSpellchecking().getValue() && TypoSpellChecker.isLoaded())
+      if (userPrefs_.realTimeSpellchecking().getValue())
       {
-         JsArray<LintItem> spellingLint = target_.getSpellingTarget().getLint();
-         for (int i = 0; i < spellingLint.length(); i++)
+         target_.getSpellingTarget().getLint(new ServerRequestCallback<JsArray<LintItem>>()
          {
-            finalLint.push(spellingLint.get(i));
-         }
+            @Override
+            public void onResponseReceived(JsArray<LintItem> response)
+            {
+               for (int i = 0; i < response.length(); i++)
+                  finalLint.push(response.get(i));
+
+               docDisplay_.showLint(finalLint);
+            }
+
+            @Override
+            public void onError(ServerError error)
+            {
+               Debug.logError(error);
+            }
+         });
       }
-      docDisplay_.showLint(finalLint);
+      else
+         docDisplay_.showLint(finalLint);
    }
    
    public void schedule(int milliseconds)

@@ -1,7 +1,7 @@
 /*
  * DialogHtmlSanitizer.java
  *
- * Copyright (C) 2009-16 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -26,7 +26,7 @@ import com.google.gwt.safehtml.shared.SafeHtml;
 import com.google.gwt.safehtml.shared.SafeHtmlUtils;
 
 public final class DialogHtmlSanitizer implements HtmlSanitizer {
-   private static final Set<String> TAG_WHITELIST = new HashSet<String>(
+   private static final Set<String> TAG_WHITELIST = new HashSet<>(
       Arrays.asList(
          "p", "em", "strong", "b", "i", "a"
       )
@@ -56,7 +56,7 @@ public final class DialogHtmlSanitizer implements HtmlSanitizer {
          String tag = null;
          boolean isValidTag = false;
          if (tagEnd > 0) {
-            if (segment.charAt(0) == '/') {
+            if (StringUtil.charAt(segment, 0) == '/') {
                tagStart = 1;
             }
             tag = segment.substring(tagStart, tagEnd).toLowerCase();

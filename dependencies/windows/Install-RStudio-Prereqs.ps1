@@ -42,17 +42,17 @@ try {
 
 # install R
 if (-Not (Test-Path -Path "C:\R")) {
-    $RSetupPackage = "C:\R-3.5.0-win.exe"
+    $RSetupPackage = "C:\R-3.6.3-win.exe"
     if (-Not (Test-Path -Path $RSetupPackage)) {
-        Write-Host "Downloading R 3.5.0..."
-        Download-File https://cran.rstudio.com/bin/windows/base/old/3.5.0/R-3.5.0-win.exe $RSetupPackage
+        Write-Host "Downloading R 3.6.3..."
+        Download-File https://cran.rstudio.com/bin/windows/base/old/3.6.3/R-3.6.3-win.exe $RSetupPackage
     } else {
         Write-Host "Using previously downloaded R installer"
     }
     Write-Host "Installing R..."
-    Start-Process $RSetupPackage -Wait -ArgumentList '/VERYSILENT /DIR="C:\R\R-3.5.0\"'
+    Start-Process $RSetupPackage -Wait -ArgumentList '/VERYSILENT /DIR="C:\R\R-3.6.3\"'
     if ($DeleteDownloads) { Remove-Item $RSetupPackage -Force }
-    $env:path += ';C:\R\R-3.5.0\bin\i386\'
+    $env:path += ';C:\R\R-3.6.3\bin\i386\'
     [Environment]::SetEnvironmentVariable('Path', $env:path, [System.EnvironmentVariableTarget]::Machine);
 } else {
     Write-Host "C:\R already exists, skipping R installation"
@@ -83,9 +83,10 @@ Remove-Item -Force 'C:\ProgramData\chocolatey\bin\cpack.exe'
 
 Write-Host "-----------------------------------------------------------"
 Write-Host "Core dependencies successfully installed. Next steps:"
-Write-Host "(1) Start a non-adminstrator Command Prompt"
-Write-Host "(2) git clone https://github.com/rstudio/rstudio"
-Write-Host "(3) change working dir to rstudio\src\dependencies\windows"
-Write-Host "(4) install-dependencies.cmd"
-Write-Host "(5) open Qt Creator, load rstudio\src\cpp\CMakelists.txt"
+Write-Host "(1) Install Qt 5.12.8 from https://qt.io for MSVC 2017 64-bit with QtWebEngine"
+Write-Host "(2) Start a non-administrator Command Prompt"
+Write-Host "(3) git clone https://github.com/rstudio/rstudio"
+Write-Host "(4) change working dir to rstudio\src\dependencies\windows"
+Write-Host "(5) install-dependencies.cmd"
+Write-Host "(6) open Qt Creator, load rstudio\src\cpp\CMakelists.txt"
 Write-Host "-----------------------------------------------------------"

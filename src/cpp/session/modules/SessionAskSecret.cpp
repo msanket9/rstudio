@@ -1,7 +1,7 @@
 /*
  * SessionAskSecret.cpp
  *
- * Copyright (C) 2009-18 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -15,11 +15,11 @@
 
 #include "SessionAskSecret.hpp"
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include <core/Exec.hpp>
 #include <core/Log.hpp>
-#include <core/json/Json.hpp>
+#include <shared_core/json/Json.hpp>
 
 #include <r/RExec.hpp>
 #include <r/RSexp.hpp>
@@ -35,7 +35,8 @@
 #endif
 
 
-using namespace rstudio::core ;
+using namespace rstudio::core;
+using namespace boost::placeholders;
 
 namespace rstudio {
 namespace session {
@@ -148,7 +149,7 @@ Error askForSecret(const std::string& name,
    // if secret changed
    if (pInput->changed)
    {
-      pInput->secret = value.get_value<std::string>();
+      pInput->secret = value.getValue<std::string>();
 
       // decrypt if necessary
 #ifdef RSTUDIO_SERVER
@@ -209,7 +210,7 @@ Error initialize()
    RS_REGISTER_CALL_METHOD(rs_askForSecret);
 
    // complete initialization
-   ExecBlock initBlock ;
+   ExecBlock initBlock;
    initBlock.addFunctions()
       (boost::bind(module_context::sourceModuleRFile, "SessionAskSecret.R"));
    return initBlock.execute();

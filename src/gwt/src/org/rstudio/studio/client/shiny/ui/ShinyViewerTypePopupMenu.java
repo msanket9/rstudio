@@ -1,7 +1,7 @@
 /*
  * ShinyViewerTypePopupMenu.java
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -16,6 +16,7 @@ package org.rstudio.studio.client.shiny.ui;
 
 import org.rstudio.core.client.StringUtil;
 import org.rstudio.core.client.widget.ToolbarPopupMenu;
+import org.rstudio.core.client.widget.UserPrefMenuItem;
 import org.rstudio.studio.client.common.shiny.model.ShinyServerOperations;
 import org.rstudio.studio.client.server.ServerError;
 import org.rstudio.studio.client.server.ServerRequestCallback;
@@ -30,6 +31,7 @@ public class ShinyViewerTypePopupMenu extends ToolbarPopupMenu
 {
    @Inject
    public ShinyViewerTypePopupMenu(Commands commands,
+                                   UserPrefs prefs,
                                    ShinyServerOperations server)
    {
       commands_ = commands;
@@ -38,6 +40,11 @@ public class ShinyViewerTypePopupMenu extends ToolbarPopupMenu
       addItem(commands.shinyRunInPane().createMenuItem(false));
       addSeparator();
       addItem(commands.shinyRunInBrowser().createMenuItem(false));
+      addSeparator();
+      addItem(new UserPrefMenuItem<>(prefs.shinyBackgroundJobs(), 
+            false, "In R Console", prefs));
+      addItem(new UserPrefMenuItem<>(prefs.shinyBackgroundJobs(), 
+            true, "In Background Job", prefs));
       addSeparator();
       addItem(commands.shinyRecordTest().createMenuItem(false));
       addItem(commands.shinyRunAllTests().createMenuItem(false));

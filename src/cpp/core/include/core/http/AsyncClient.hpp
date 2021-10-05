@@ -1,7 +1,7 @@
 /*
  * AsyncClient.hpp
  *
- * Copyright (C) 2009-19 by RStudio, Inc.
+ * Copyright (C) 2021 by RStudio, PBC
  *
  * Unless you have received this program directly from RStudio pursuant
  * to the terms of a commercial license agreement with RStudio, then
@@ -30,7 +30,6 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 
-#include <core/Error.hpp>
 #include <core/Log.hpp>
 #include <core/system/System.hpp>
 #include <core/Thread.hpp>
@@ -43,13 +42,15 @@
 #include <core/http/SocketUtils.hpp>
 #include <core/http/ConnectionRetryProfile.hpp>
 
+#include <shared_core/Error.hpp>
+
 // special version of unexpected exception handler which makes
 // sure to call the user's ErrorHandler
 #define CATCH_UNEXPECTED_ASYNC_CLIENT_EXCEPTION \
    catch(const std::exception& e) \
    { \
       handleUnexpectedError(std::string("Unexpected exception: ") + \
-                            e.what(), ERROR_LOCATION) ;  \
+                            e.what(), ERROR_LOCATION);  \
    } \
    catch(...) \
    { \
@@ -127,6 +128,11 @@ public:
       errorHandler_ = errorHandler;
       if (chunkHandler)
          chunkHandler_ = chunkHandler;
+
+      // if the host header is not already set, make sure we stamp a default one
+      // this is required by the http standard
+      if (request_.host().empty())
+         request_.setHost(getDefaultHostHeader());
 
       // connect and write request (implmented in a protocol
       // specific manner by subclassees)
@@ -227,6 +233,24 @@ public:
       });
    }
 
+   virtual void setConnectHandler(const ConnectHandler& connectHandler)
+   {
+      // if we are already connected, don't bother saving the connect handler
+      // and just invoke it directly
+      bool invokeConnectHandler = false;
+      LOCK_MUTEX(socketMutex_)
+      {
+         if (!requestWritten_)
+            connectHandler_ = connectHandler;
+         else
+            invokeConnectHandler = true;
+      }
+      END_LOCK_MUTEX
+
+      if (invokeConnectHandler)
+         connectHandler();
+   }
+
 protected:
 
    boost::asio::io_service& ioService() { return ioService_; }
@@ -312,7 +336,7 @@ protected:
 private:
 
    virtual void connectAndWriteRequest() = 0;
-
+   virtual std::string getDefaultHostHeader() = 0;
 
    bool retryConnectionIfRequired(const Error& connectionError,
                                   Error* pOtherError)
@@ -405,24 +429,6 @@ private:
          }
       }
       CATCH_UNEXPECTED_ASYNC_CLIENT_EXCEPTION
-   }
-
-   virtual void setConnectHandler(const ConnectHandler& connectHandler)
-   {
-      // if we are already connected, don't bother saving the connect handler
-      // and just invoke it directly
-      bool invokeConnectHandler = false;
-      LOCK_MUTEX(socketMutex_)
-      {
-         if (!requestWritten_)
-            connectHandler_ = connectHandler;
-         else
-            invokeConnectHandler = true;
-      }
-      END_LOCK_MUTEX
-
-      if (invokeConnectHandler)
-         connectHandler();
    }
 
    void handleWrite(const boost::system::error_code& ec)
@@ -606,6 +612,30 @@ private:
       CATCH_UNEXPECTED_ASYNC_CLIENT_EXCEPTION
    }
 
+   void breakChunks(std::deque<boost::shared_ptr<std::string>>& chunks)
+   {
+      std::deque<boost::shared_ptr<std::string>> newChunks;
+
+      for (const boost::shared_ptr<std::string>& chunk : chunks)
+      {
+         if (chunk->size() > maxChunkSize)
+         {
+            // break the chunk into more reasonable partial chunks with each chunk being
+            // less than or equal to the max chunk size
+            size_t numChunks = static_cast<size_t>(ceil(static_cast<double>(chunk->size()) / maxChunkSize));
+            for (size_t i = 0; i < numChunks; ++i)
+            {
+               std::string chunkPiece = chunk->substr(maxChunkSize * i, maxChunkSize);
+               newChunks.push_back(boost::make_shared<std::string>(std::move(chunkPiece)));
+            }
+         }
+         else
+            newChunks.push_back(chunk);
+      }
+
+      chunks = newChunks;
+   }
+
    void processChunks()
    {
       if (!chunkParser_)
@@ -621,6 +651,10 @@ private:
       // parse the bytes into chunks
       std::deque<boost::shared_ptr<std::string> > chunks;
       bool complete = chunkParser_->parse(bufferPtr, responseBuffer_.size(), &chunks);
+
+      // break up any enormous chunks into more manageable pieces ensure we
+      // do not hit any buffering limits preventing us from forwarding the chunk
+      breakChunks(chunks);
 
       bool chunksHandled = deliverChunks(chunks, complete);
 
@@ -746,6 +780,8 @@ protected:
    bool chunkedEncoding_;
 
 private:
+   static constexpr double maxChunkSize = 1024.0*1024.0; // 1MB
+
    boost::asio::io_service& ioService_;
    ConnectionRetryContext connectionRetryContext_;
    bool logToStderr_;
